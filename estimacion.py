@@ -31,7 +31,7 @@ N_FILL = 5000
 KNN_NEIGHBORS = 5
 # CSV con puntos originales + puntos de relleno (columna origen: original | relleno)
 OUTPUT_COMBINED_PATH = Path("data/processed/cluster/puntos_originales_y_relleno.csv")
-
+IMAGENES_DIR = Path("imagenes")
 # Paleta (misma que Analisis_cluster)
 CLUSTER_PALETTE = [
     "#2563eb", "#dc2626", "#059669", "#d97706",
@@ -122,6 +122,7 @@ def plot_3d_clusters(
     n_clusters: int,
     s: int = 25,
     alpha: float = 0.7,
+    save_path: Path | None = None,
 ) -> None:
     """Scatter 3D coloreado por cluster (misma línea que Analisis_cluster)."""
     from mpl_toolkits.mplot3d import Axes3D  # noqa: F401
@@ -136,6 +137,9 @@ def plot_3d_clusters(
     ax.set_title(title)
     plt.colorbar(sc, ax=ax, shrink=0.5, pad=0.12, label="Cluster", ticks=np.arange(n_clusters))
     plt.tight_layout()
+    if save_path:
+        save_path.parent.mkdir(parents=True, exist_ok=True)
+        plt.savefig(save_path)
     plt.show()
 
 
@@ -146,6 +150,7 @@ def plot_3d_original_plus_filled(
     coord_labels: list[str],
     title: str,
     n_clusters: int,
+    save_path: Path | None = None,
 ) -> None:
     """3D: originales coloreados por cluster + puntos de relleno en gris (sin cluster)."""
     from mpl_toolkits.mplot3d import Axes3D  # noqa: F401
@@ -172,6 +177,9 @@ def plot_3d_original_plus_filled(
     )
     ax.legend()
     plt.tight_layout()
+    if save_path:
+        save_path.parent.mkdir(parents=True, exist_ok=True)
+        plt.savefig(save_path)
     plt.show()
 
 
@@ -179,6 +187,7 @@ def plot_3d_original_plus_filled(
 # %%
 if __name__ == "__main__":
     setup_report_style()
+    IMAGENES_DIR.mkdir(parents=True, exist_ok=True)
 
     df = pd.read_csv(INPUT_PATH)
     coords = df[COORD_COLS].values
@@ -192,6 +201,7 @@ if __name__ == "__main__":
         COORD_LABELS,
         "Datos originales — coloreados por cluster",
         n_clusters,
+        save_path=IMAGENES_DIR / "estimacion_3d_originales_cluster.png",
     )
 
     # 2) Convex hull por cluster + relleno (puntos sin cluster; los asignas tú después)
@@ -204,6 +214,7 @@ if __name__ == "__main__":
             COORD_LABELS,
             f"Originales + relleno (N_FILL={N_FILL})",
             n_clusters,
+            save_path=IMAGENES_DIR / "estimacion_3d_originales_mas_relleno.png",
         )
 
         # KNN: asignar cluster a cada punto de relleno (entrenado con originales, coords estandarizadas)
@@ -228,6 +239,7 @@ if __name__ == "__main__":
             n_clusters,
             s=15,
             alpha=0.5,
+            save_path=IMAGENES_DIR / "estimacion_3d_originales_relleno_con_cluster.png",
         )
 
         # CSV único: puntos originales + puntos de relleno (columna origen)

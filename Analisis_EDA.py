@@ -27,6 +27,8 @@ TARGET_LABEL = "Recuperación en peso (%)"
 # Etiquetas de ejes para coordenadas (opcional; si None se usan los nombres de columna)
 COORD_LABELS = ["Este (m)", "Norte (m)", "Cota (m)"]
 OUTPUT_PATH = "data/processed/df_rec_peso_pnd25.xlsx"
+# Carpeta donde se guardan las figuras (se crea al ejecutar)
+IMAGENES_DIR = Path("imagenes")
 # Valor sentinela: filas con este valor se eliminan (trazabilidad de limpieza)
 SENTINEL_VALUE = -99
 
@@ -108,6 +110,7 @@ def plot_histogram(
     kde: bool = True,
     xlabel: Optional[str] = None,
     title: Optional[str] = None,
+    save_path: Optional[Path] = None,
 ) -> None:
     """Histograma (y KDE opcional) de una columna. Formato para informe."""
     fig, ax = plt.subplots(figsize=(6, 4))
@@ -117,6 +120,9 @@ def plot_histogram(
         ax.set_title(title)
     ax.set_ylabel("Frecuencia")
     plt.tight_layout()
+    if save_path:
+        save_path.parent.mkdir(parents=True, exist_ok=True)
+        plt.savefig(save_path)
     plt.show()
 
 
@@ -160,6 +166,7 @@ def plot_normal_score_diagnostic(
     nscore_col: str,
     bins: int = 50,
     value_label: Optional[str] = None,
+    save_path: Optional[Path] = None,
 ) -> None:
     """2x2: histogramas original y nscore, y Q-Q plots. Formato para informe."""
     label = value_label or original_col
@@ -186,6 +193,9 @@ def plot_normal_score_diagnostic(
     axes[1, 1].get_lines()[0].set_alpha(0.8)
 
     plt.tight_layout()
+    if save_path:
+        save_path.parent.mkdir(parents=True, exist_ok=True)
+        plt.savefig(save_path)
     plt.show()
 
 
@@ -210,6 +220,7 @@ def plot_drift(
     n_bins: int = 20,
     coord_labels: Optional[List[str]] = None,
     value_label: Optional[str] = None,
+    save_path: Optional[Path] = None,
 ) -> None:
     """Gráficos de deriva (promedio por bins) para cada coordenada. Formato para informe."""
     x_labels = coord_labels if coord_labels is not None else coord_cols
@@ -225,6 +236,9 @@ def plot_drift(
         ax.set_ylabel(f"Promedio {y_label}")
         ax.set_title(f"Deriva según {x_label}")
     plt.tight_layout()
+    if save_path:
+        save_path.parent.mkdir(parents=True, exist_ok=True)
+        plt.savefig(save_path)
     plt.show()
 
 
@@ -240,6 +254,7 @@ def plot_3d(
     zlabel: Optional[str] = None,
     color_label: Optional[str] = None,
     cmap: str = "jet",
+    save_path: Optional[Path] = None,
 ) -> None:
     """Scatter 3D coloreado por variable. Formato para informe."""
     from mpl_toolkits.mplot3d import Axes3D  # noqa: F401
@@ -254,6 +269,9 @@ def plot_3d(
         ax.set_title(title)
     plt.colorbar(sc, ax=ax, shrink=0.5, pad=0.12, label=color_label or color_col)
     plt.tight_layout()
+    if save_path:
+        save_path.parent.mkdir(parents=True, exist_ok=True)
+        plt.savefig(save_path)
     plt.show()
 
 
@@ -265,6 +283,7 @@ def plot_2d_projections(
     coord_labels: Optional[List[str]] = None,
     color_label: Optional[str] = None,
     cmap: str = "jet",
+    save_path: Optional[Path] = None,
 ) -> None:
     """Proyecciones 2D (XY, YZ, XZ) coloreadas por variable. Formato para informe."""
     x, y, z = coord_cols
@@ -281,6 +300,9 @@ def plot_2d_projections(
     if suptitle:
         fig.suptitle(suptitle, fontsize=12, weight="bold", y=1.02)
     plt.tight_layout()
+    if save_path:
+        save_path.parent.mkdir(parents=True, exist_ok=True)
+        plt.savefig(save_path)
     plt.show()
 
 
@@ -288,6 +310,7 @@ def plot_2d_projections(
 # %%
 if __name__ == "__main__":
     setup_report_style()
+    IMAGENES_DIR.mkdir(parents=True, exist_ok=True)
     coord_labels = COORD_LABELS or COORDS  # etiquetas para ejes en figuras
 
     df = load_and_select(DATA_PATH, COORDS, TARGET)
@@ -306,18 +329,23 @@ if __name__ == "__main__":
         df, TARGET, bins=20, kde=True,
         xlabel=TARGET_LABEL,
         title=f"Distribución de {TARGET_LABEL}",
+        save_path=IMAGENES_DIR / "eda_histograma_distribucion.png",
     )
 
     # %%
     nscore_col = add_normal_score(df, TARGET)
     print_normal_score_stats(df, TARGET, nscore_col)
-    plot_normal_score_diagnostic(df, TARGET, nscore_col, value_label=TARGET_LABEL)
+    plot_normal_score_diagnostic(
+        df, TARGET, nscore_col, value_label=TARGET_LABEL,
+        save_path=IMAGENES_DIR / "eda_diagnostico_normal_score.png",
+    )
 
     # %%
     plot_drift(
         df, COORDS, TARGET, n_bins=20,
         coord_labels=coord_labels,
         value_label=TARGET_LABEL,
+        save_path=IMAGENES_DIR / "eda_deriva_coordenadas.png",
     )
 
     # %%
@@ -326,12 +354,14 @@ if __name__ == "__main__":
         title=f"Distribución espacial — coloreado por {TARGET_LABEL}",
         xlabel=coord_labels[0], ylabel=coord_labels[1], zlabel=coord_labels[2],
         color_label=TARGET_LABEL,
+        save_path=IMAGENES_DIR / "eda_3d_espacial_target.png",
     )
     plot_3d(
         df, COORDS[0], COORDS[1], COORDS[2], nscore_col,
         title=f"Distribución espacial — coloreado por normal score ({TARGET_LABEL})",
         xlabel=coord_labels[0], ylabel=coord_labels[1], zlabel=coord_labels[2],
         color_label=f"{TARGET_LABEL} (normal score)",
+        save_path=IMAGENES_DIR / "eda_3d_espacial_nscore.png",
     )
 
     # %%
@@ -340,12 +370,14 @@ if __name__ == "__main__":
         suptitle=f"Proyecciones 2D — {TARGET_LABEL}",
         coord_labels=coord_labels,
         color_label=TARGET_LABEL,
+        save_path=IMAGENES_DIR / "eda_proyecciones_2d_target.png",
     )
     plot_2d_projections(
         df, COORDS, nscore_col,
         suptitle=f"Proyecciones 2D — {TARGET_LABEL} (normal score)",
         coord_labels=coord_labels,
         color_label=f"{TARGET_LABEL} (normal score)",
+        save_path=IMAGENES_DIR / "eda_proyecciones_2d_nscore.png",
     )
 
     # %%

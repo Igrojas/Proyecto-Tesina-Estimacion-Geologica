@@ -47,6 +47,7 @@ K_RANGE = (2, 11)  # prueba k desde 2 hasta k_max - 1
 RUN_CON_NSCORE = True   # clustering con (coords + variable normal score)
 RUN_SIN_NSCORE = True   # clustering solo con coordenadas (sin nscore)
 OUTPUT_DIR = Path("data/processed/cluster")
+IMAGENES_DIR = Path("imagenes")
 
 
 def _cluster_cmap_norm(n_clusters: int) -> Tuple[ListedColormap, BoundaryNorm]:
@@ -136,6 +137,7 @@ def evaluate_k_range(
 def plot_k_selection(
     results: pd.DataFrame,
     title: str = "Selección del número de clusters",
+    save_path: Optional[Path] = None,
 ) -> None:
     """
     Gráfico doble: inercia (método del codo) y silueta vs k.
@@ -160,6 +162,9 @@ def plot_k_selection(
     if title:
         ax1.set_title(title)
     plt.tight_layout()
+    if save_path:
+        save_path.parent.mkdir(parents=True, exist_ok=True)
+        plt.savefig(save_path)
     plt.show()
 
 
@@ -185,6 +190,7 @@ def plot_cluster_summary(
     cluster_col: str = "cluster",
     suptitle_prefix: str = "",
     value_col: Optional[str] = None,
+    save_path: Optional[Path] = None,
 ) -> None:
     """
     Gráficos de resumen del clustering.
@@ -246,6 +252,9 @@ def plot_cluster_summary(
     axes[2].legend()
     axes[2].grid(True, alpha=0.35)
     plt.tight_layout()
+    if save_path:
+        save_path.parent.mkdir(parents=True, exist_ok=True)
+        plt.savefig(save_path)
     plt.show()
 
 
@@ -256,6 +265,7 @@ def plot_clusters_3d(
     n_clusters: Optional[int] = None,
     coord_labels: Optional[List[str]] = None,
     title: Optional[str] = None,
+    save_path: Optional[Path] = None,
 ) -> None:
     """Visualización 3D de los clusters. Colorbar discreta: solo colores de clusters presentes."""
     from mpl_toolkits.mplot3d import Axes3D  # noqa: F401
@@ -276,6 +286,9 @@ def plot_clusters_3d(
         ax.set_title(title)
     plt.colorbar(sc, ax=ax, shrink=0.5, pad=0.12, label="Cluster", ticks=np.arange(k))
     plt.tight_layout()
+    if save_path:
+        save_path.parent.mkdir(parents=True, exist_ok=True)
+        plt.savefig(save_path)
     plt.show()
 
 
@@ -286,6 +299,7 @@ def plot_clusters_2d(
     n_clusters: Optional[int] = None,
     coord_labels: Optional[List[str]] = None,
     suptitle: Optional[str] = None,
+    save_path: Optional[Path] = None,
 ) -> None:
     """Proyecciones 2D (XY, YZ, XZ) coloreadas por cluster."""
     x, y, z = coord_cols
@@ -306,6 +320,9 @@ def plot_clusters_2d(
     if suptitle:
         fig.suptitle(suptitle, fontsize=12, weight="bold", y=1.02)
     plt.tight_layout()
+    if save_path:
+        save_path.parent.mkdir(parents=True, exist_ok=True)
+        plt.savefig(save_path)
     plt.show()
 
 
@@ -331,6 +348,7 @@ def plot_drift(
     coord_labels: Optional[List[str]] = None,
     value_label: Optional[str] = None,
     title_prefix: str = "Deriva",
+    save_path: Optional[Path] = None,
 ) -> None:
     """Gráficos de deriva (promedio por bins) para cada coordenada."""
     x_labels = coord_labels or coord_cols
@@ -348,6 +366,9 @@ def plot_drift(
     plt.tight_layout()
     ylim = (0, df[value_col].max())
     plt.ylim(ylim)
+    if save_path:
+        save_path.parent.mkdir(parents=True, exist_ok=True)
+        plt.savefig(save_path)
     plt.show()
 
 
@@ -374,6 +395,7 @@ def run_clustering_pipeline(
     target_col: str,
     n_clusters: int,
     k_range: Tuple[int, int],
+    file_suffix: str,
 ) -> pd.DataFrame:
     """
     Ejecuta exploración de k, clustering y todos los gráficos para un modo (con o sin nscore).
@@ -386,7 +408,10 @@ def run_clustering_pipeline(
     k_results = evaluate_k_range(df, feature_cols, k_min=k_min, k_max=k_max)
     print("Métricas por k:")
     print(k_results.to_string(index=False))
-    plot_k_selection(k_results, title=f"Selección de k — {mode_label}")
+    plot_k_selection(
+        k_results, title=f"Selección de k — {mode_label}",
+        save_path=IMAGENES_DIR / f"cluster_seleccion_k_{file_suffix}.png",
+    )
 
     df = fit_clusters(df, feature_cols, n_clusters, cluster_col=cluster_col)
     print(f"Clustering aplicado → columna '{cluster_col}'.")
@@ -400,16 +425,19 @@ def run_clustering_pipeline(
         cluster_col=cluster_col,
         suptitle_prefix=mode_label,
         value_col=value_col_summary,
+        save_path=IMAGENES_DIR / f"cluster_resumen_{file_suffix}.png",
     )
     plot_clusters_3d(
         df, COORDS, cluster_col=cluster_col, n_clusters=n_clusters,
         coord_labels=coord_labels,
         title=f"Distribución espacial de clusters — {mode_label}",
+        save_path=IMAGENES_DIR / f"cluster_3d_espacial_{file_suffix}.png",
     )
     plot_clusters_2d(
         df, COORDS, cluster_col=cluster_col, n_clusters=n_clusters,
         coord_labels=coord_labels,
         suptitle=f"Proyecciones 2D — {mode_label}",
+        save_path=IMAGENES_DIR / f"cluster_proyecciones_2d_{file_suffix}.png",
     )
     stats_df = stats_by_cluster(df, TARGET, cluster_col=cluster_col)
     print("Estadísticas por cluster:")
@@ -421,6 +449,7 @@ def run_clustering_pipeline(
 # %%
 if __name__ == "__main__":
     setup_report_style()
+    IMAGENES_DIR.mkdir(parents=True, exist_ok=True)
     coord_labels = COORD_LABELS or COORDS
     nscore_col = f"{TARGET}{NSCORE_SUFFIX}"
     k_min, k_max = K_RANGE
@@ -437,14 +466,14 @@ if __name__ == "__main__":
         feature_cols_con = COORDS + [nscore_col]
         df = run_clustering_pipeline(
             df, feature_cols_con, "cluster_con_nscore", "Con nscore (coords + variable)",
-            coord_labels, nscore_col, TARGET, N_CLUSTERS, K_RANGE,
+            coord_labels, nscore_col, TARGET, N_CLUSTERS, K_RANGE, "con_nscore",
         )
 
     if RUN_SIN_NSCORE:
         feature_cols_sin = COORDS
         df = run_clustering_pipeline(
             df, feature_cols_sin, "cluster_sin_nscore", "Sin nscore (solo coords)",
-            coord_labels, nscore_col, TARGET, N_CLUSTERS, K_RANGE,
+            coord_labels, nscore_col, TARGET, N_CLUSTERS, K_RANGE, "sin_nscore",
         )
     # df tiene ahora cluster_con_nscore y/o cluster_sin_nscore según lo ejecutado
 
@@ -469,6 +498,7 @@ if __name__ == "__main__":
         coord_labels=coord_labels,
         value_label=TARGET_LABEL,
         title_prefix=f"Deriva (cluster {CLUSTER_PARA_DERIVA}, {cluster_col_deriva})",
+        save_path=IMAGENES_DIR / "cluster_deriva_cluster0.png",
     )
 
 # %%

@@ -23,3 +23,6 @@ Thumbs.db
 
 # Jupyter
 .ipynb_checkpoints/
+
+# Figuras generadas por los scripts (descomenta si quieres versionarlas)
+# imagenes/
