@@ -100,7 +100,7 @@ def summary_quality(df: pd.DataFrame) -> None:
     print("Datos faltantes (null/na):")
     display(df.isnull().sum())
     print("Estadística descriptiva:")
-    display(df.describe())
+    display(df.describe().round(2))
 
 
 def plot_histogram(
@@ -235,6 +235,8 @@ def plot_drift(
         ax.set_xlabel(x_label)
         ax.set_ylabel(f"Promedio {y_label}")
         ax.set_title(f"Deriva según {x_label}")
+        ax.set_ylim(0, 35)
+
     plt.tight_layout()
     if save_path:
         save_path.parent.mkdir(parents=True, exist_ok=True)
@@ -348,7 +350,7 @@ if __name__ == "__main__":
         save_path=IMAGENES_DIR / "eda_deriva_coordenadas.png",
     )
 
-    # %%
+     # %%
     plot_3d(
         df, COORDS[0], COORDS[1], COORDS[2], TARGET,
         title=f"Distribución espacial — coloreado por {TARGET_LABEL}",
