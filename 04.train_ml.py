@@ -24,6 +24,7 @@ warnings.filterwarnings("ignore")
 INPUT_PATH = Path("data/processed/cluster/clusters_df_con_nscore.csv")
 INPUT_COMBINED_PATH = Path("data/processed/cluster/puntos_originales_y_relleno.csv")
 OUTPUT_DF_RELLENO_PATH = Path("data/processed/df_relleno.csv")
+OUTPUT_METRICAS_ML_PATH = Path("data/processed/metricas_ml.csv")
 IMAGENES_DIR = Path("imagenes")
 COORD_COLS = ["Este", "Norte", "Cota"]
 COORD_LABELS = ["Este (m)", "Norte (m)", "Cota (m)"]
@@ -32,7 +33,8 @@ TARGET_COL = "Rec_Peso_PND25_(%)_nscore"
 TARGET_LABEL = "Recuperación en peso (%) (normal score)"
 ORIGEN_COL = "origen"
 TEST_SIZE = 0.2
-N_ITER = 500  # iteraciones para obtener distribución de R² y RMSE
+N_ITER = 20  # iteraciones para obtener distribución de R² y RMSE (histograma)
+RANDOM_STATE = 42  # seed para entrenamiento único (tabla y modelo final)
 
 
 def setup_report_style() -> None:
@@ -160,24 +162,53 @@ if __name__ == "__main__":
         r2_xgb.append(r2_score(y_test, y_pred_xgb))
         rmse_xgb.append(np.sqrt(mean_squared_error(y_test, y_pred_xgb)))
 
-    # Resumen: media ± desv estándar
-    print("Distribución de métricas (media ± std):")
+    # Resumen distribución (solo para el histograma)
+    print("Distribución de métricas (media ± std) — múltiples particiones:")
     print(f"  KNN:     R² = {np.mean(r2_knn):.4f} ± {np.std(r2_knn):.4f}  |  RMSE = {np.mean(rmse_knn):.4f} ± {np.std(rmse_knn):.4f}")
     print(f"  XGBoost: R² = {np.mean(r2_xgb):.4f} ± {np.std(r2_xgb):.4f}  |  RMSE = {np.mean(rmse_xgb):.4f} ± {np.std(rmse_xgb):.4f}")
 
-    # Gráficos: distribución R² y RMSE
+    # Gráficos: distribución R² y RMSE (iteraciones)
     compare_models_distrib(
         r2_knn, rmse_knn, r2_xgb, rmse_xgb,
         save_path=IMAGENES_DIR / "train_ml_distribucion_R2_RMSE.png",
     )
 
-    # Real vs predicho (última iteración)
-    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=TEST_SIZE)
-    knn = KNeighborsRegressor(n_neighbors=5).fit(X_train, y_train)
-    xgb = XGBRegressor().fit(X_train, y_train)
+    # --- Un único modelo con seed (reproducible): métricas para la tabla y modelo final ---
+    X_train, X_test, y_train, y_test = train_test_split(
+        X, y, test_size=TEST_SIZE, random_state=RANDOM_STATE
+    )
+    n_test = len(y_test)
+
+    knn = KNeighborsRegressor(n_neighbors=5)
+    knn.fit(X_train, y_train)
+    y_pred_knn = knn.predict(X_test)
+    r2_knn_final = r2_score(y_test, y_pred_knn)
+    rmse_knn_final = np.sqrt(mean_squared_error(y_test, y_pred_knn))
+
+    xgb = XGBRegressor(random_state=RANDOM_STATE)
+    xgb.fit(X_train, y_train)
+    y_pred_xgb = xgb.predict(X_test)
+    r2_xgb_final = r2_score(y_test, y_pred_xgb)
+    rmse_xgb_final = np.sqrt(mean_squared_error(y_test, y_pred_xgb))
+
+    print("\nModelo único (seed=%d) — métricas para tabla:" % RANDOM_STATE)
+    print(f"  N (test) = {n_test}")
+    print(f"  KNN:     R² = {r2_knn_final:.4f}  |  RMSE = {rmse_knn_final:.4f}")
+    print(f"  XGBoost: R² = {r2_xgb_final:.4f}  |  RMSE = {rmse_xgb_final:.4f}")
+
+    # Guardar métricas en formato tabla (sin std: un solo modelo)
+    df_metricas = pd.DataFrame([
+        {"modelo": "KNN", "n": n_test, "R2": r2_knn_final, "RMSE": rmse_knn_final},
+        {"modelo": "XGBoost", "n": n_test, "R2": r2_xgb_final, "RMSE": rmse_xgb_final},
+    ])
+    OUTPUT_METRICAS_ML_PATH.parent.mkdir(parents=True, exist_ok=True)
+    df_metricas.to_csv(OUTPUT_METRICAS_ML_PATH, index=False)
+    print(f"Métricas guardadas en: {OUTPUT_METRICAS_ML_PATH}")
+
+    # Real vs predicho (modelo único con seed)
     fig, axes = plt.subplots(1, 2, figsize=(10, 5))
-    plot_real_vs_pred(y_test.values, knn.predict(X_test), "KNN", ax=axes[0])
-    plot_real_vs_pred(y_test.values, xgb.predict(X_test), "XGBoost", ax=axes[1])
+    plot_real_vs_pred(y_test.values, y_pred_knn, "KNN", ax=axes[0])
+    plot_real_vs_pred(y_test.values, y_pred_xgb, "XGBoost", ax=axes[1])
     plt.tight_layout()
     plt.savefig(IMAGENES_DIR / "train_ml_real_vs_predicho_KNN_XGBoost.png")
     plt.show()

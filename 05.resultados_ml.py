@@ -16,6 +16,8 @@ warnings.filterwarnings("ignore")
 INPUT_DF_RELLENO_PATH = Path("data/processed/df_relleno.csv")
 INPUT_COMBINED_PATH = Path("data/processed/cluster/puntos_originales_y_relleno.csv")
 OUTPUT_TABLA_TESINA_PATH = Path("data/processed/tabla_resultados_ml_tesina.xlsx")
+OUTPUT_TABLA_MODELOS_PATH = Path("data/processed/tabla_resultados_modelos_tesina.xlsx")
+METRICAS_ML_PATH = Path("data/processed/metricas_ml.csv")  # opcional: generado por train_ml.py
 IMAGENES_DIR = Path("imagenes")
 COORD_COLS = ["Este", "Norte", "Cota"]
 COORD_LABELS = ["Este (m)", "Norte (m)", "Cota (m)"]
@@ -133,8 +135,8 @@ def export_tabla_resultados_tesina(
 ) -> None:
     """Genera un Excel en formato de tabla autoexplicativa para la tesina.
 
-    Incluye caption, encabezados con numeración (1)-(6), filas para Datos originales,
-    KNN y XGBoost (Promedio, Desv. Est., Mín, Máx., Diferencia de medias) y nota al pie.
+    Incluye caption, encabezados con numeración (1)-(7), filas para Datos originales,
+    KNN y XGBoost (N, Promedio, Desv. Est., Mín, Máx., Diferencia de medias) y nota al pie.
     """
     try:
         from openpyxl import Workbook
@@ -173,10 +175,8 @@ def export_tabla_resultados_tesina(
     )
     nota = (
         "(a) Elaboración propia en base a datos procesados (cluster con nscore y predicciones de modelos KNN y XGBoost). "
-        "(b) n = tamaño de muestra. "
-        "Desv. Est. = desviación estándar. "
-        "Mín = mínimo valor observado. "
-        "Máx. = máximo valor observado. "
+        "(b) N = número de datos. Desv. Est. = desviación estándar. "
+        "Mín = mínimo valor observado. Máx. = máximo valor observado. "
         "Diferencia de medias = diferencia respecto a la media de datos originales."
     )
 
@@ -193,54 +193,163 @@ def export_tabla_resultados_tesina(
     ws["A1"] = caption
     ws["A1"].font = font_caption
     ws["A1"].alignment = align_wrap
-    ws.merge_cells("A1:F1")
+    ws.merge_cells("A1:G1")
 
-    # Fila 3: encabezados principales
-    headers = ["Muestra", "Promedio", "Desv. Est.", "Mín", "Máx.", "Diferencia de medias"]
+    # Fila 3: encabezados (con N)
+    headers = ["Muestra", "N", "Promedio", "Desv. Est.", "Mín", "Máx.", "Diferencia de medias"]
     for c, h in enumerate(headers, start=1):
         cell = ws.cell(row=3, column=c, value=h)
         cell.font = font_header
 
-    # Fila 4: numeración (1)-(6)
-    for c in range(1, 7):
+    # Fila 4: numeración (1)-(7)
+    for c in range(1, 8):
         ws.cell(row=4, column=c, value=f"({c})").font = font_cell
 
-    # Filas de datos
+    # Filas de datos (con número de datos por fila)
     def fmt_num(x: float) -> str:
         return f"{x:.4f}" if pd.notna(x) else "—"
 
     data_rows = [
-        ("Datos originales", mean_orig, std_orig, min_orig, max_orig, "—"),
-        ("KNN", mean_knn, std_knn, min_knn, max_knn, diff_knn),
-        ("XGBoost", mean_xgb, std_xgb, min_xgb, max_xgb, diff_xgb),
+        ("Datos originales", n_orig, mean_orig, std_orig, min_orig, max_orig, "—"),
+        ("KNN", n_relleno, mean_knn, std_knn, min_knn, max_knn, diff_knn),
+        ("XGBoost", n_relleno, mean_xgb, std_xgb, min_xgb, max_xgb, diff_xgb),
     ]
     for i, row in enumerate(data_rows, start=5):
-        muestra, prom, desv, mn, mx, diff = row
+        muestra, n_val, prom, desv, mn, mx, diff = row
         ws.cell(row=i, column=1, value=muestra).font = font_cell
-        ws.cell(row=i, column=2, value=fmt_num(prom) if isinstance(prom, (int, float)) else prom).font = font_cell
-        ws.cell(row=i, column=3, value=fmt_num(desv) if isinstance(desv, (int, float)) else desv).font = font_cell
-        ws.cell(row=i, column=4, value=fmt_num(mn) if isinstance(mn, (int, float)) else mn).font = font_cell
-        ws.cell(row=i, column=5, value=fmt_num(mx) if isinstance(mx, (int, float)) else mx).font = font_cell
+        ws.cell(row=i, column=2, value=int(n_val) if isinstance(n_val, (int, float)) else n_val).font = font_cell
+        ws.cell(row=i, column=3, value=fmt_num(prom) if isinstance(prom, (int, float)) else prom).font = font_cell
+        ws.cell(row=i, column=4, value=fmt_num(desv) if isinstance(desv, (int, float)) else desv).font = font_cell
+        ws.cell(row=i, column=5, value=fmt_num(mn) if isinstance(mn, (int, float)) else mn).font = font_cell
+        ws.cell(row=i, column=6, value=fmt_num(mx) if isinstance(mx, (int, float)) else mx).font = font_cell
         if isinstance(diff, str):
-            ws.cell(row=i, column=6, value=diff).font = font_cell
+            ws.cell(row=i, column=7, value=diff).font = font_cell
         else:
-            ws.cell(row=i, column=6, value=fmt_num(diff)).font = font_cell
+            ws.cell(row=i, column=7, value=fmt_num(diff)).font = font_cell
 
     # Nota al pie
     row_nota = 9
     ws.cell(row=row_nota, column=1, value="Nota:").font = font_header
     ws.cell(row=row_nota + 1, column=1, value=nota).font = font_caption
     ws.cell(row=row_nota + 1, column=1).alignment = align_wrap
-    ws.merge_cells(f"A{row_nota + 1}:F{row_nota + 1}")
+    ws.merge_cells(f"A{row_nota + 1}:G{row_nota + 1}")
 
     # Ajustar ancho de columnas
     ws.column_dimensions["A"].width = 22
-    for col in "BCDEF":
+    for col in "BCDEFG":
         ws.column_dimensions[col].width = 14
 
     output_path.parent.mkdir(parents=True, exist_ok=True)
     wb.save(output_path)
     print(f"Tabla para tesina guardada en: {output_path}")
+
+
+def export_tabla_modelos_tesina(
+    output_path: Path,
+    tabla_num: int = 2,
+    resultados: list[dict] | pd.DataFrame | None = None,
+    metricas_path: Path | None = None,
+) -> None:
+    """Genera un Excel con resultados de modelos (N, Modelo, R², RMSE, etc.) para la tesina.
+
+    resultados: lista de dicts con keys modelo, n, R2, RMSE; opcionalmente R2_std, RMSE_std, MAE.
+    Si resultados es None y metricas_path existe, se cargan las métricas desde ese CSV.
+    El CSV debe tener columnas: modelo, n, R2, RMSE (y opcionalmente R2_std, RMSE_std).
+    """
+    try:
+        from openpyxl import Workbook
+        from openpyxl.styles import Alignment, Font
+    except ImportError:
+        raise ImportError("Se requiere openpyxl para exportar la tabla. Instala con: pip install openpyxl")
+
+    if resultados is None and metricas_path is not None and metricas_path.exists():
+        df_m = pd.read_csv(metricas_path)
+        resultados = df_m.to_dict("records")
+    if resultados is None or len(resultados) == 0:
+        # Plantilla para rellenar manualmente o tras ejecutar train_ml
+        resultados = [
+            {"modelo": "KNN", "n": "—", "R2": "—", "RMSE": "—", "R2_std": None, "RMSE_std": None},
+            {"modelo": "XGBoost", "n": "—", "R2": "—", "RMSE": "—", "R2_std": None, "RMSE_std": None},
+        ]
+
+    if isinstance(resultados, pd.DataFrame):
+        resultados = resultados.to_dict("records")
+
+    titulo = "Resultados de modelos de predicción (validación)"
+    n_obs = sum(r.get("n", 0) for r in resultados if isinstance(r.get("n"), (int, float)))
+    caption = (
+        f"Tabla {tabla_num}: {titulo}. "
+        f"Número de datos de evaluación por modelo según partición train/test. "
+        "(Letra 10, espaciado simple.)"
+    )
+    nota = (
+        "(a) Elaboración propia. N = número de datos en conjunto de evaluación (test). "
+        "R² = coeficiente de determinación. RMSE = raíz del error cuadrático medio. "
+        "Si se reporta ±, corresponde a desviación estándar sobre múltiples particiones."
+    )
+
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "Resultados modelos"
+
+    font_caption = Font(size=10)
+    font_header = Font(bold=True, size=10)
+    font_cell = Font(size=10)
+    align_wrap = Alignment(wrap_text=True, vertical="top")
+
+    # Encabezados: N, Modelo, R², RMSE (y opcionalmente R² (desv.), RMSE (desv.))
+    has_std = any(
+        isinstance(r.get("R2_std"), (int, float)) or isinstance(r.get("RMSE_std"), (int, float))
+        for r in resultados
+    )
+    headers = ["Modelo", "N", "R²", "RMSE"]
+    if has_std:
+        headers.extend(["R² (desv. est.)", "RMSE (desv. est.)"])
+    n_cols = len(headers)
+
+    ws["A1"] = caption
+    ws["A1"].font = font_caption
+    ws["A1"].alignment = align_wrap
+    ws.merge_cells(f"A1:{chr(64 + n_cols)}1")
+
+    for c, h in enumerate(headers, start=1):
+        ws.cell(row=3, column=c, value=h).font = font_header
+    for c in range(1, n_cols + 1):
+        ws.cell(row=4, column=c, value=f"({c})").font = font_cell
+
+    def fmt(x) -> str:
+        if x is None or (isinstance(x, float) and pd.isna(x)):
+            return "—"
+        if isinstance(x, (int, float)):
+            return f"{x:.4f}"
+        return str(x)
+
+    for i, r in enumerate(resultados, start=5):
+        modelo = r.get("modelo", "")
+        n_val = r.get("n")
+        r2 = r.get("R2")
+        rmse = r.get("RMSE")
+        ws.cell(row=i, column=1, value=modelo).font = font_cell
+        ws.cell(row=i, column=2, value=int(n_val) if isinstance(n_val, (int, float)) else fmt(n_val)).font = font_cell
+        ws.cell(row=i, column=3, value=fmt(r2)).font = font_cell
+        ws.cell(row=i, column=4, value=fmt(rmse)).font = font_cell
+        if has_std:
+            ws.cell(row=i, column=5, value=fmt(r.get("R2_std"))).font = font_cell
+            ws.cell(row=i, column=6, value=fmt(r.get("RMSE_std"))).font = font_cell
+
+    row_nota = 5 + len(resultados) + 1
+    ws.cell(row=row_nota, column=1, value="Nota:").font = font_header
+    ws.cell(row=row_nota + 1, column=1, value=nota).font = font_caption
+    ws.cell(row=row_nota + 1, column=1).alignment = align_wrap
+    ws.merge_cells(f"A{row_nota + 1}:{chr(64 + n_cols)}{row_nota + 1}")
+
+    ws.column_dimensions["A"].width = 14
+    for j in range(2, n_cols + 1):
+        ws.column_dimensions[chr(64 + j)].width = 14
+
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    wb.save(output_path)
+    print(f"Tabla de modelos para tesina guardada en: {output_path}")
 
 
 # --- Carga y visualización ---
@@ -265,6 +374,13 @@ if __name__ == "__main__":
         df_relleno,
         OUTPUT_TABLA_TESINA_PATH,
         tabla_num=1,
+    )
+
+    # --- Tabla de resultados de modelos (N, Modelo, R², RMSE); carga desde CSV si existe ---
+    export_tabla_modelos_tesina(
+        OUTPUT_TABLA_MODELOS_PATH,
+        tabla_num=2,
+        metricas_path=METRICAS_ML_PATH,
     )
 
     # --- Scatter 3D por predicción ---
