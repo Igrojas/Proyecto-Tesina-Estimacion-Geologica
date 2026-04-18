@@ -22,8 +22,8 @@ warnings.filterwarnings("ignore")
 
 # --- Configuración ---
 INPUT_PATH = Path("data/processed/cluster/clusters_df_con_nscore.csv")
-INPUT_COMBINED_PATH = Path("data/processed/cluster/puntos_originales_y_relleno.csv")
-OUTPUT_DF_RELLENO_PATH = Path("data/processed/df_relleno.csv")
+INPUT_COMBINED_PATH = Path("data/processed/cluster/puntos_originales_y_validacion.csv")
+OUTPUT_DF_VAL_PATH = Path("data/processed/df_validacion_predicciones.csv")
 OUTPUT_METRICAS_ML_PATH = Path("data/processed/metricas_ml.csv")
 IMAGENES_DIR = Path("imagenes")
 COORD_COLS = ["Este", "Norte", "Cota"]
@@ -87,7 +87,7 @@ def plot_real_vs_pred(
     model_name: str,
     ax: plt.Axes | None = None,
 ) -> plt.Axes:
-    """Gráfico real vs predicho (misma línea que otros scripts)."""
+    """Gráfico real vs predicho (scatter 1:1)."""
     if ax is None:
         fig, ax = plt.subplots(figsize=(5, 5))
     ax.scatter(y_real, y_pred, alpha=0.6, s=20, color="#2563eb", edgecolors="white", linewidths=0.3)
@@ -181,15 +181,15 @@ if __name__ == "__main__":
 
     knn = KNeighborsRegressor(n_neighbors=5)
     knn.fit(X_train, y_train)
-    y_pred_knn = knn.predict(X_test)
-    r2_knn_final = r2_score(y_test, y_pred_knn)
-    rmse_knn_final = np.sqrt(mean_squared_error(y_test, y_pred_knn))
+    y_pred_knn_final = knn.predict(X_test)
+    r2_knn_final = r2_score(y_test, y_pred_knn_final)
+    rmse_knn_final = np.sqrt(mean_squared_error(y_test, y_pred_knn_final))
 
     xgb = XGBRegressor(random_state=RANDOM_STATE)
     xgb.fit(X_train, y_train)
-    y_pred_xgb = xgb.predict(X_test)
-    r2_xgb_final = r2_score(y_test, y_pred_xgb)
-    rmse_xgb_final = np.sqrt(mean_squared_error(y_test, y_pred_xgb))
+    y_pred_xgb_final = xgb.predict(X_test)
+    r2_xgb_final = r2_score(y_test, y_pred_xgb_final)
+    rmse_xgb_final = np.sqrt(mean_squared_error(y_test, y_pred_xgb_final))
 
     print("\nModelo único (seed=%d) — métricas para tabla:" % RANDOM_STATE)
     print(f"  N (test) = {n_test}")
@@ -207,30 +207,34 @@ if __name__ == "__main__":
 
     # Real vs predicho (modelo único con seed)
     fig, axes = plt.subplots(1, 2, figsize=(10, 5))
-    plot_real_vs_pred(y_test.values, y_pred_knn, "KNN", ax=axes[0])
-    plot_real_vs_pred(y_test.values, y_pred_xgb, "XGBoost", ax=axes[1])
+    plot_real_vs_pred(y_test.values, y_pred_knn_final, "KNN", ax=axes[0])
+    plot_real_vs_pred(y_test.values, y_pred_xgb_final, "XGBoost", ax=axes[1])
     plt.tight_layout()
     plt.savefig(IMAGENES_DIR / "train_ml_real_vs_predicho_KNN_XGBoost.png")
     plt.show()
 
-    # --- Predicción sobre puntos de relleno (modelo ya entrenado arriba) ---
+    # --- Predicción sobre puntos de VALIDACIÓN (modelo ya entrenado arriba) ---
     # %%
-    df_full = pd.read_csv(INPUT_COMBINED_PATH)
-    df_relleno = df_full[df_full[ORIGEN_COL] == "relleno"].copy()
-    
-    df_orig = df_full[df_full[ORIGEN_COL] == "original"].copy()
+    if not INPUT_COMBINED_PATH.exists():
+        print(f"AVISO: No se encontró {INPUT_COMBINED_PATH}. Ejecuta primero 03.estimacion.py.")
+    else:
+        df_full = pd.read_csv(INPUT_COMBINED_PATH)
+        df_val = df_full[df_full[ORIGEN_COL] == "validacion"].copy()
+        
+        if df_val.empty:
+            print("ERROR: No se encontraron puntos con origen 'validacion' en el archivo combinado.")
+        else:
+            X_val, _, _ = build_X(df_val, scaler, dummy_cols)
 
-    X_relleno, _, _ = build_X(df_relleno, scaler, dummy_cols)
+            y_pred_knn_val = knn.predict(X_val)
+            y_pred_xgb_val = xgb.predict(X_val)
 
-    y_pred_knn = knn.predict(X_relleno)
-    y_pred_xgb = xgb.predict(X_relleno)
+            df_val["pred_nscore_knn"] = y_pred_knn_val
+            df_val["pred_nscore_xgb"] = y_pred_xgb_val
 
-    df_relleno["pred_nscore_knn"] = y_pred_knn
-    df_relleno["pred_nscore_xgb"] = y_pred_xgb
-
-    OUTPUT_DF_RELLENO_PATH.parent.mkdir(parents=True, exist_ok=True)
-    df_relleno.to_csv(OUTPUT_DF_RELLENO_PATH, index=False)
-    print(f"DataFrame con predicciones guardado en: {OUTPUT_DF_RELLENO_PATH}")
+            OUTPUT_DF_VAL_PATH.parent.mkdir(parents=True, exist_ok=True)
+            df_val.to_csv(OUTPUT_DF_VAL_PATH, index=False)
+            print(f"DataFrame con predicciones de validación guardado en: {OUTPUT_DF_VAL_PATH}")
 
 
 # %%

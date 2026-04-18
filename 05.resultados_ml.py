@@ -1,33 +1,40 @@
 # %%
 """
 Visualización y análisis de resultados de predicción (KNN y XGBoost).
-Carga el DataFrame df_relleno generado por train_ml.py y genera gráficos.
+Carga el DataFrame df_validacion_predicciones generado por train_ml.py y genera gráficos.
+Des-transforma las predicciones (Normal Score -> %) para comparar con 'recpe'.
 """
 
 import warnings
 from pathlib import Path
 
 import matplotlib.pyplot as plt
+import numpy as np
 import pandas as pd
+from sklearn.metrics import mean_squared_error, r2_score
+from sklearn.preprocessing import QuantileTransformer
 
 warnings.filterwarnings("ignore")
 
 # --- Configuración ---
-INPUT_DF_RELLENO_PATH = Path("data/processed/df_relleno.csv")
-INPUT_COMBINED_PATH = Path("data/processed/cluster/puntos_originales_y_relleno.csv")
+INPUT_DF_VAL_PATH = Path("data/processed/df_validacion_predicciones.csv")
+INPUT_TRAIN_DATA_PATH = Path("data/processed/cluster/clusters_df_con_nscore.csv")
+INPUT_COMBINED_PATH = Path("data/processed/cluster/puntos_originales_y_validacion.csv")
 OUTPUT_TABLA_TESINA_PATH = Path("data/processed/tabla_resultados_ml_tesina.xlsx")
 OUTPUT_TABLA_MODELOS_PATH = Path("data/processed/tabla_resultados_modelos_tesina.xlsx")
-METRICAS_ML_PATH = Path("data/processed/metricas_ml.csv")  # opcional: generado por train_ml.py
 IMAGENES_DIR = Path("imagenes")
 COORD_COLS = ["Este", "Norte", "Cota"]
 COORD_LABELS = ["Este (m)", "Norte (m)", "Cota (m)"]
+CLUSTER_COL = "cluster_con_nscore"
 ORIGEN_COL = "origen"
-VALUE_COL_ORIG = "Rec_Peso_PND25_(%)_nscore"
-VALUE_LABEL = "Recuperación en peso (%) (normal score)"
+VALUE_COL_ORIG_REAL = "Rec_Peso_PND25_(%)"
+VALUE_COL_ORIG_NSCORE = "Rec_Peso_PND25_(%)_nscore"
+VALUE_COL_VAL_REAL = "recpe"  # Columna real en datos de validación
+VALUE_LABEL = "Recuperación en peso (%)"
 
 
 def setup_report_style() -> None:
-    """Estilo de figuras (misma línea que Analisis_EDA / Analisis_cluster)."""
+    """Estilo de figuras (proporcional y limpio)."""
     plt.rcParams.update({
         "figure.dpi": 150,
         "savefig.dpi": 300,
@@ -47,6 +54,17 @@ def setup_report_style() -> None:
     })
 
 
+def set_proportional_aspect(ax: plt.Axes, df: pd.DataFrame) -> None:
+    """Ajusta el aspect ratio del gráfico 3D según el rango real de las coordenadas."""
+    x, y, z = df[COORD_COLS[0]], df[COORD_COLS[1]], df[COORD_COLS[2]]
+    range_x = x.max() - x.min()
+    range_y = y.max() - y.min()
+    range_z = z.max() - z.min()
+    max_range = max(range_x, range_y, range_z)
+    if max_range > 0:
+        ax.set_box_aspect((range_x / max_range, range_y / max_range, range_z / max_range))
+
+
 def drift_by_bins(
     df: pd.DataFrame,
     coord_col: str,
@@ -63,460 +81,172 @@ def drift_by_bins(
 
 def plot_drift_comparison(
     df_orig: pd.DataFrame,
-    df_relleno: pd.DataFrame,
+    df_val: pd.DataFrame,
     coord_cols: list[str],
     n_bins: int = 20,
     coord_labels: list[str] | None = None,
-    value_label: str | None = None,
     save_path: Path | None = None,
 ) -> None:
-    """Deriva (promedio por bins) para cada coordenada: Original, KNN y XGBoost en la misma gráfica."""
+    """Deriva: Compara Original vs Validación (Real) vs Predicciones en unidades reales."""
     x_labels = coord_labels if coord_labels is not None else coord_cols
-    y_label = value_label or VALUE_LABEL
     n = len(coord_cols)
     fig, axes = plt.subplots(1, n, figsize=(5 * n, 4))
     if n == 1:
         axes = [axes]
+    
     for ax, coord, x_label in zip(axes, coord_cols, x_labels):
-        dr_orig = drift_by_bins(df_orig, coord, VALUE_COL_ORIG, n_bins=n_bins)
-        dr_knn = drift_by_bins(df_relleno, coord, "pred_nscore_knn", n_bins=n_bins)
-        dr_xgb = drift_by_bins(df_relleno, coord, "pred_nscore_xgb", n_bins=n_bins)
-        ax.plot(dr_orig["coord_center"], dr_orig["mean"], "o-", linewidth=1, markersize=5, color="#7c3aed", label="Original")
-        ax.plot(dr_knn["coord_center"], dr_knn["mean"], "o--", linewidth=1, markersize=5, color="#2563eb", label="KNN")
-        ax.plot(dr_xgb["coord_center"], dr_xgb["mean"], "o--", linewidth=1, markersize=5, color="#059669", label="XGBoost")
+        dr_orig = drift_by_bins(df_orig, coord, VALUE_COL_ORIG_REAL, n_bins=n_bins)
+        dr_val_real = drift_by_bins(df_val, coord, VALUE_COL_VAL_REAL, n_bins=n_bins)
+        dr_knn = drift_by_bins(df_val, coord, "pred_real_knn", n_bins=n_bins)
+        dr_xgb = drift_by_bins(df_val, coord, "pred_real_xgb", n_bins=n_bins)
+        
+        ax.plot(dr_orig["coord_center"], dr_orig["mean"], "o-", linewidth=1, markersize=4, color="#7c3aed", label="Orig. (Train)")
+        ax.plot(dr_val_real["coord_center"], dr_val_real["mean"], "s-", linewidth=1, markersize=4, color="#ef4444", label="Val. (Real)")
+        ax.plot(dr_knn["coord_center"], dr_knn["mean"], "--", linewidth=1, color="#2563eb", label="Pred. KNN")
+        ax.plot(dr_xgb["coord_center"], dr_xgb["mean"], "--", linewidth=1, color="#059669", label="Pred. XGBoost")
+        
         ax.set_xlabel(x_label)
-        ax.set_ylabel(f"Promedio {y_label}")
-        ax.set_title(f"Deriva según {x_label}")
-        ax.legend()
-        ax.grid(True, alpha=0.35)
+        ax.set_ylabel("Promedio (%)")
+        ax.set_title(f"Deriva Real: {x_label}")
+        ax.legend(fontsize=8)
+    
     plt.tight_layout()
     if save_path:
-        save_path.parent.mkdir(parents=True, exist_ok=True)
         plt.savefig(save_path)
     plt.show()
 
 
-def plot_3d_cmap(
+def plot_3d_proportional(
     df: pd.DataFrame,
-    coord_cols: list[str],
     color_col: str,
-    coord_labels: list[str],
     title: str,
+    label: str,
     cmap: str = "jet",
     save_path: Path | None = None,
 ) -> None:
-    """Scatter 3D coloreado por una variable continua (cmap)."""
+    """Scatter 3D proporcional coloreado por una variable."""
     from mpl_toolkits.mplot3d import Axes3D  # noqa: F401
-
-    fig = plt.figure(figsize=(8, 6))
+    fig = plt.figure(figsize=(10, 8))
     ax = fig.add_subplot(111, projection="3d")
     sc = ax.scatter(
-        df[coord_cols[0]], df[coord_cols[1]], df[coord_cols[2]],
+        df[COORD_COLS[0]], df[COORD_COLS[1]], df[COORD_COLS[2]],
         c=df[color_col], cmap=cmap, s=15, alpha=0.7,
     )
-    ax.set_xlabel(coord_labels[0])
-    ax.set_ylabel(coord_labels[1])
-    ax.set_zlabel(coord_labels[2])
+    ax.set_xlabel(COORD_LABELS[0])
+    ax.set_ylabel(COORD_LABELS[1])
+    ax.set_zlabel(COORD_LABELS[2])
     ax.set_title(title)
-    plt.colorbar(sc, ax=ax, shrink=0.5, pad=0.12, label=color_col)
+    set_proportional_aspect(ax, df)
+    plt.colorbar(sc, ax=ax, shrink=0.5, pad=0.1, label=label)
     plt.tight_layout()
     if save_path:
-        save_path.parent.mkdir(parents=True, exist_ok=True)
         plt.savefig(save_path)
     plt.show()
 
 
-def export_tabla_resultados_tesina(
-    df_orig: pd.DataFrame,
-    df_relleno: pd.DataFrame,
+def export_tabla_validacion_tesina(
+    df_val: pd.DataFrame,
     output_path: Path,
-    tabla_num: int = 1,
-    titulo_variable: str | None = None,
 ) -> None:
-    """Genera un Excel en formato de tabla autoexplicativa para la tesina.
-
-    Incluye caption, encabezados con numeración (1)-(7), filas para Datos originales,
-    KNN y XGBoost (N, Promedio, Desv. Est., Mín, Máx., Diferencia de medias) y nota al pie.
-    """
-    try:
-        from openpyxl import Workbook
-        from openpyxl.styles import Alignment, Font
-    except ImportError:
-        raise ImportError("Se requiere openpyxl para exportar la tabla. Instala con: pip install openpyxl")
-
-    col_orig = VALUE_COL_ORIG
-    mean_orig = df_orig[col_orig].mean()
-    std_orig = df_orig[col_orig].std()
-    min_orig = df_orig[col_orig].min()
-    max_orig = df_orig[col_orig].max()
-    n_orig = len(df_orig)
-
-    mean_knn = df_relleno["pred_nscore_knn"].mean()
-    std_knn = df_relleno["pred_nscore_knn"].std()
-    min_knn = df_relleno["pred_nscore_knn"].min()
-    max_knn = df_relleno["pred_nscore_knn"].max()
-    n_relleno = len(df_relleno)
-
-    mean_xgb = df_relleno["pred_nscore_xgb"].mean()
-    std_xgb = df_relleno["pred_nscore_xgb"].std()
-    min_xgb = df_relleno["pred_nscore_xgb"].min()
-    max_xgb = df_relleno["pred_nscore_xgb"].max()
-
-    diff_knn = mean_knn - mean_orig
-    diff_xgb = mean_xgb - mean_orig
-
-    titulo = titulo_variable or (
-        "Recuperación en peso (%) (normal score): datos originales y predicciones KNN y XGBoost"
-    )
-    caption = (
-        f"Tabla {tabla_num}: Estadísticas descriptivas de {titulo}, "
-        f"n (original) = {n_orig}, n (relleno) = {n_relleno}. "
-        "(Letra 10, espaciado simple.)"
-    )
-    nota = (
-        "(a) Elaboración propia en base a datos procesados (cluster con nscore y predicciones de modelos KNN y XGBoost). "
-        "(b) N = número de datos. Desv. Est. = desviación estándar. "
-        "Mín = mínimo valor observado. Máx. = máximo valor observado. "
-        "Diferencia de medias = diferencia respecto a la media de datos originales."
-    )
-
-    wb = Workbook()
-    ws = wb.active
-    ws.title = "Resultados ML"
-
-    font_caption = Font(size=10)
-    font_header = Font(bold=True, size=10)
-    font_cell = Font(size=10)
-    align_wrap = Alignment(wrap_text=True, vertical="top")
-
-    # Fila 1: caption
-    ws["A1"] = caption
-    ws["A1"].font = font_caption
-    ws["A1"].alignment = align_wrap
-    ws.merge_cells("A1:G1")
-
-    # Fila 3: encabezados (con N)
-    headers = ["Muestra", "N", "Promedio", "Desv. Est.", "Mín", "Máx.", "Diferencia de medias"]
-    for c, h in enumerate(headers, start=1):
-        cell = ws.cell(row=3, column=c, value=h)
-        cell.font = font_header
-
-    # Fila 4: numeración (1)-(7)
-    for c in range(1, 8):
-        ws.cell(row=4, column=c, value=f"({c})").font = font_cell
-
-    # Filas de datos (con número de datos por fila)
-    def fmt_num(x: float) -> str:
-        return f"{x:.4f}" if pd.notna(x) else "—"
-
-    data_rows = [
-        ("Datos originales", n_orig, mean_orig, std_orig, min_orig, max_orig, "—"),
-        ("KNN", n_relleno, mean_knn, std_knn, min_knn, max_knn, diff_knn),
-        ("XGBoost", n_relleno, mean_xgb, std_xgb, min_xgb, max_xgb, diff_xgb),
-    ]
-    for i, row in enumerate(data_rows, start=5):
-        muestra, n_val, prom, desv, mn, mx, diff = row
-        ws.cell(row=i, column=1, value=muestra).font = font_cell
-        ws.cell(row=i, column=2, value=int(n_val) if isinstance(n_val, (int, float)) else n_val).font = font_cell
-        ws.cell(row=i, column=3, value=fmt_num(prom) if isinstance(prom, (int, float)) else prom).font = font_cell
-        ws.cell(row=i, column=4, value=fmt_num(desv) if isinstance(desv, (int, float)) else desv).font = font_cell
-        ws.cell(row=i, column=5, value=fmt_num(mn) if isinstance(mn, (int, float)) else mn).font = font_cell
-        ws.cell(row=i, column=6, value=fmt_num(mx) if isinstance(mx, (int, float)) else mx).font = font_cell
-        if isinstance(diff, str):
-            ws.cell(row=i, column=7, value=diff).font = font_cell
-        else:
-            ws.cell(row=i, column=7, value=fmt_num(diff)).font = font_cell
-
-    # Nota al pie
-    row_nota = 9
-    ws.cell(row=row_nota, column=1, value="Nota:").font = font_header
-    ws.cell(row=row_nota + 1, column=1, value=nota).font = font_caption
-    ws.cell(row=row_nota + 1, column=1).alignment = align_wrap
-    ws.merge_cells(f"A{row_nota + 1}:G{row_nota + 1}")
-
-    # Ajustar ancho de columnas
-    ws.column_dimensions["A"].width = 22
-    for col in "BCDEFG":
-        ws.column_dimensions[col].width = 14
-
-    output_path.parent.mkdir(parents=True, exist_ok=True)
-    wb.save(output_path)
-    print(f"Tabla para tesina guardada en: {output_path}")
+    """Genera tabla de métricas de validación contra el 'recpe' real en unidades de %."""
+    y_real = df_val[VALUE_COL_VAL_REAL]
+    
+    metrics = []
+    for model in ["knn", "xgb"]:
+        y_pred = df_val[f"pred_real_{model}"]
+        r2 = r2_score(y_real, y_pred)
+        rmse = np.sqrt(mean_squared_error(y_real, y_pred))
+        bias = np.mean(y_pred - y_real)
+        metrics.append({
+            "Modelo": model.upper(),
+            "N": len(df_val),
+            "R2 (unidades reales)": r2,
+            "RMSE (unidades reales)": rmse,
+            "Sesgo (Bias %)": bias
+        })
+    
+    df_metrics = pd.DataFrame(metrics)
+    df_metrics.to_excel(output_path, index=False)
+    print(f"Métricas de validación real guardadas en: {output_path}")
 
 
-def export_tabla_modelos_tesina(
-    output_path: Path,
-    tabla_num: int = 2,
-    resultados: list[dict] | pd.DataFrame | None = None,
-    metricas_path: Path | None = None,
-) -> None:
-    """Genera un Excel con resultados de modelos (N, Modelo, R², RMSE, etc.) para la tesina.
-
-    resultados: lista de dicts con keys modelo, n, R2, RMSE; opcionalmente R2_std, RMSE_std, MAE.
-    Si resultados es None y metricas_path existe, se cargan las métricas desde ese CSV.
-    El CSV debe tener columnas: modelo, n, R2, RMSE (y opcionalmente R2_std, RMSE_std).
-    """
-    try:
-        from openpyxl import Workbook
-        from openpyxl.styles import Alignment, Font
-    except ImportError:
-        raise ImportError("Se requiere openpyxl para exportar la tabla. Instala con: pip install openpyxl")
-
-    if resultados is None and metricas_path is not None and metricas_path.exists():
-        df_m = pd.read_csv(metricas_path)
-        resultados = df_m.to_dict("records")
-    if resultados is None or len(resultados) == 0:
-        # Plantilla para rellenar manualmente o tras ejecutar train_ml
-        resultados = [
-            {"modelo": "KNN", "n": "—", "R2": "—", "RMSE": "—", "R2_std": None, "RMSE_std": None},
-            {"modelo": "XGBoost", "n": "—", "R2": "—", "RMSE": "—", "R2_std": None, "RMSE_std": None},
-        ]
-
-    if isinstance(resultados, pd.DataFrame):
-        resultados = resultados.to_dict("records")
-
-    titulo = "Resultados de modelos de predicción (validación)"
-    n_obs = sum(r.get("n", 0) for r in resultados if isinstance(r.get("n"), (int, float)))
-    caption = (
-        f"Tabla {tabla_num}: {titulo}. "
-        f"Número de datos de evaluación por modelo según partición train/test. "
-        "(Letra 10, espaciado simple.)"
-    )
-    nota = (
-        "(a) Elaboración propia. N = número de datos en conjunto de evaluación (test). "
-        "R² = coeficiente de determinación. RMSE = raíz del error cuadrático medio. "
-        "Si se reporta ±, corresponde a desviación estándar sobre múltiples particiones."
-    )
-
-    wb = Workbook()
-    ws = wb.active
-    ws.title = "Resultados modelos"
-
-    font_caption = Font(size=10)
-    font_header = Font(bold=True, size=10)
-    font_cell = Font(size=10)
-    align_wrap = Alignment(wrap_text=True, vertical="top")
-
-    # Encabezados: N, Modelo, R², RMSE (y opcionalmente R² (desv.), RMSE (desv.))
-    has_std = any(
-        isinstance(r.get("R2_std"), (int, float)) or isinstance(r.get("RMSE_std"), (int, float))
-        for r in resultados
-    )
-    headers = ["Modelo", "N", "R²", "RMSE"]
-    if has_std:
-        headers.extend(["R² (desv. est.)", "RMSE (desv. est.)"])
-    n_cols = len(headers)
-
-    ws["A1"] = caption
-    ws["A1"].font = font_caption
-    ws["A1"].alignment = align_wrap
-    ws.merge_cells(f"A1:{chr(64 + n_cols)}1")
-
-    for c, h in enumerate(headers, start=1):
-        ws.cell(row=3, column=c, value=h).font = font_header
-    for c in range(1, n_cols + 1):
-        ws.cell(row=4, column=c, value=f"({c})").font = font_cell
-
-    def fmt(x) -> str:
-        if x is None or (isinstance(x, float) and pd.isna(x)):
-            return "—"
-        if isinstance(x, (int, float)):
-            return f"{x:.4f}"
-        return str(x)
-
-    for i, r in enumerate(resultados, start=5):
-        modelo = r.get("modelo", "")
-        n_val = r.get("n")
-        r2 = r.get("R2")
-        rmse = r.get("RMSE")
-        ws.cell(row=i, column=1, value=modelo).font = font_cell
-        ws.cell(row=i, column=2, value=int(n_val) if isinstance(n_val, (int, float)) else fmt(n_val)).font = font_cell
-        ws.cell(row=i, column=3, value=fmt(r2)).font = font_cell
-        ws.cell(row=i, column=4, value=fmt(rmse)).font = font_cell
-        if has_std:
-            ws.cell(row=i, column=5, value=fmt(r.get("R2_std"))).font = font_cell
-            ws.cell(row=i, column=6, value=fmt(r.get("RMSE_std"))).font = font_cell
-
-    row_nota = 5 + len(resultados) + 1
-    ws.cell(row=row_nota, column=1, value="Nota:").font = font_header
-    ws.cell(row=row_nota + 1, column=1, value=nota).font = font_caption
-    ws.cell(row=row_nota + 1, column=1).alignment = align_wrap
-    ws.merge_cells(f"A{row_nota + 1}:{chr(64 + n_cols)}{row_nota + 1}")
-
-    ws.column_dimensions["A"].width = 14
-    for j in range(2, n_cols + 1):
-        ws.column_dimensions[chr(64 + j)].width = 14
-
-    output_path.parent.mkdir(parents=True, exist_ok=True)
-    wb.save(output_path)
-    print(f"Tabla de modelos para tesina guardada en: {output_path}")
-
-
-# --- Carga y visualización ---
+# --- Ejecución ---
 # %%
 if __name__ == "__main__":
     setup_report_style()
     IMAGENES_DIR.mkdir(parents=True, exist_ok=True)
 
-    df_relleno = pd.read_csv(INPUT_DF_RELLENO_PATH)
+    if not INPUT_DF_VAL_PATH.exists():
+        raise FileNotFoundError(f"No se encontró {INPUT_DF_VAL_PATH}. Ejecuta primero 04.train_ml.py.")
+
+    # A) Cargar datos de validación
+    df_val = pd.read_csv(INPUT_DF_VAL_PATH)
     df_full = pd.read_csv(INPUT_COMBINED_PATH)
     df_orig = df_full[df_full[ORIGEN_COL] == "original"].copy()
 
-    if df_relleno.empty:
-        raise FileNotFoundError(
-            f"No hay datos en {INPUT_DF_RELLENO_PATH}. "
-            "Ejecuta antes train_ml.py para generar el DataFrame con predicciones."
-        )
-
-    # --- Tabla para tesina (formato autoexplicativo) ---
-    export_tabla_resultados_tesina(
-        df_orig,
-        df_relleno,
-        OUTPUT_TABLA_TESINA_PATH,
-        tabla_num=1,
+    # B) Re-instanciar y entrenar el transformer para des-transformar (Normal Score -> %)
+    # Cargamos el archivo original de entrenamiento que tiene tanto raw como nscore
+    if not INPUT_TRAIN_DATA_PATH.exists():
+        raise FileNotFoundError(f"No se encontró {INPUT_TRAIN_DATA_PATH}. Se necesita para revertir nscore.")
+    
+    df_train_ref = pd.read_csv(INPUT_TRAIN_DATA_PATH)
+    
+    target_transformer = QuantileTransformer(
+        n_quantiles=1000, 
+        output_distribution="normal", 
+        random_state=42
     )
+    # Ajustamos con los valores originales (%)
+    target_transformer.fit(df_train_ref[VALUE_COL_ORIG_REAL].values.reshape(-1, 1))
 
-    # --- Tabla de resultados de modelos (N, Modelo, R², RMSE); carga desde CSV si existe ---
-    export_tabla_modelos_tesina(
-        OUTPUT_TABLA_MODELOS_PATH,
-        tabla_num=2,
-        metricas_path=METRICAS_ML_PATH,
-    )
+    # C) Des-transformar predicciones de validación
+    for model in ["knn", "xgb"]:
+        nscore_preds = df_val[f"pred_nscore_{model}"].values.reshape(-1, 1)
+        real_preds = target_transformer.inverse_transform(nscore_preds)
+        df_val[f"pred_real_{model}"] = real_preds.flatten()
 
-    # --- Scatter 3D por predicción ---
-    plot_3d_cmap(
-        df_relleno, COORD_COLS, "pred_nscore_knn", COORD_LABELS, "Predicción KNN",
-        save_path=IMAGENES_DIR / "resultados_ml_3d_prediccion_KNN.png",
-    )
-    plot_3d_cmap(
-        df_relleno, COORD_COLS, "pred_nscore_xgb", COORD_LABELS, "Predicción XGBoost",
-        save_path=IMAGENES_DIR / "resultados_ml_3d_prediccion_XGBoost.png",
-    )
+    print(f"Cargados {len(df_val)} puntos de validación. Predicciones des-transformadas a unidades reales (%).")
 
-    # --- Histograma: distribución de predicciones vs original ---
-    plt.figure(figsize=(8, 5))
-    plt.hist(df_relleno["pred_nscore_knn"], bins="auto", alpha=0.7, color="#2563eb", edgecolor="white", label="KNN", density=True)
-    plt.hist(df_relleno["pred_nscore_xgb"], bins="auto", alpha=0.7, color="#059669", edgecolor="white", label="XGBoost", density=True)
-    plt.hist(df_orig["Rec_Peso_PND25_(%)_nscore"], bins="auto", alpha=0.7, color="#7c3aed", edgecolor="white", label="Original", density=True)
-    plt.xlabel("Predicción")
-    plt.ylabel("Frecuencia")
-    plt.title("Distribución de predicciones")
+    # 1) Métricas de Validación en UNIDADES REALES
+    export_tabla_validacion_tesina(df_val, OUTPUT_TABLA_MODELOS_PATH)
+
+    # 2) Gráficos 3D Proporcionales (Unidades Reales %)
+    plot_3d_proportional(df_val, VALUE_COL_VAL_REAL, "Validación: Recpe Real (%)", "Rec_Peso (%)", 
+                         save_path=IMAGENES_DIR / "resultados_val_real_3d_target.png")
+    plot_3d_proportional(df_val, "pred_real_knn", "Validación: Predicción KNN (%)", "Pred. Real (%)", 
+                         save_path=IMAGENES_DIR / "resultados_val_real_3d_knn.png")
+    plot_3d_proportional(df_val, "pred_real_xgb", "Validación: Predicción XGBoost (%)", "Pred. Real (%)", 
+                         save_path=IMAGENES_DIR / "resultados_val_real_3d_xgb.png")
+
+    # 3) Comparación de Deriva (Drift Analysis) en UNIDADES REALES
+    plot_drift_comparison(df_orig, df_val, COORD_COLS, coord_labels=COORD_LABELS,
+                          save_path=IMAGENES_DIR / "resultados_val_real_drift_comparativo.png")
+
+    # 4) Histograma Comparativo en UNIDADES REALES
+    plt.figure(figsize=(10, 6))
+    plt.hist(df_val[VALUE_COL_VAL_REAL], bins=30, alpha=0.5, label="Val. Real (recpe)", color="#ef4444", density=True)
+    plt.hist(df_val["pred_real_knn"], bins=30, alpha=0.5, label="Pred. KNN (%)", color="#2563eb", density=True)
+    plt.hist(df_val["pred_real_xgb"], bins=30, alpha=0.5, label="Pred. XGBoost (%)", color="#059669", density=True)
+    plt.title("Distribución de Valores Reales: Real vs Predicho (%)")
+    plt.xlabel("Recuperación (%)")
+    plt.ylabel("Densidad")
     plt.legend()
-    plt.grid(True, alpha=0.35, axis="y")
-    plt.tight_layout()
-    plt.savefig(IMAGENES_DIR / "resultados_ml_histograma_distribucion.png")
+    plt.savefig(IMAGENES_DIR / "resultados_val_real_histograma.png")
     plt.show()
 
-    # --- Deriva: Original vs KNN vs XGBoost (misma gráfica por coordenada) ---
-    plot_drift_comparison(
-        df_orig,
-        df_relleno,
-        COORD_COLS,
-        n_bins=20,
-        coord_labels=COORD_LABELS,
-        value_label=VALUE_LABEL,
-        save_path=IMAGENES_DIR / "resultados_ml_deriva_comparacion.png",
-    )
-
-    # --- Agregados por cluster ---
-    agg_pred_por_cluster = df_relleno.groupby("cluster_con_nscore")[["pred_nscore_knn", "pred_nscore_xgb"]].agg(
-        ["mean", "min", "max"]
-    )
-    agg_real_por_cluster = df_orig.groupby("cluster_con_nscore")["Rec_Peso_PND25_(%)_nscore"].agg(
-        ["mean", "min", "max"]
-    )
-
-    # Media por cluster
-    plt.figure(figsize=(8, 5))
-    plt.plot(
-        agg_pred_por_cluster.index,
-        agg_pred_por_cluster["pred_nscore_knn"]["mean"],
-        marker="o",
-        label="KNN (relleno)",
-    )
-    plt.plot(
-        agg_pred_por_cluster.index,
-        agg_pred_por_cluster["pred_nscore_xgb"]["mean"],
-        marker="o",
-        label="XGBoost (relleno)",
-    )
-    plt.plot(
-        agg_real_por_cluster.index,
-        agg_real_por_cluster["mean"],
-        marker="o",
-        label="Original",
-        linestyle="--",
-        color="#7c3aed",
-    )
-    plt.xlabel("Cluster")
-    plt.ylabel("Predicción media (normal score)")
-    plt.title("Media de predicción por cluster")
-    plt.legend()
-    plt.grid(True, alpha=0.35)
+    # 5) Scatter Real vs Predicho en UNIDADES REALES
+    fig, axes = plt.subplots(1, 2, figsize=(12, 5))
+    for ax, model, color in zip(axes, ["knn", "xgb"], ["#2563eb", "#059669"]):
+        ax.scatter(df_val[VALUE_COL_VAL_REAL], df_val[f"pred_real_{model}"], alpha=0.4, s=10, color=color)
+        min_v = min(df_val[VALUE_COL_VAL_REAL].min(), df_val[f"pred_real_{model}"].min())
+        max_v = max(df_val[VALUE_COL_VAL_REAL].max(), df_val[f"pred_real_{model}"].max())
+        ax.plot([min_v, max_v], [min_v, max_v], 'k--', lw=2, label="1:1")
+        ax.set_title(f"Validación Real: Real vs {model.upper()} (%)")
+        ax.set_xlabel("Real (%)")
+        ax.set_ylabel("Predicho (%)")
+        ax.legend()
     plt.tight_layout()
-    plt.savefig(IMAGENES_DIR / "resultados_ml_media_por_cluster.png")
-    plt.show()
-
-    # Mínimo por cluster
-    plt.figure(figsize=(8, 5))
-    plt.plot(
-        agg_pred_por_cluster.index,
-        agg_pred_por_cluster["pred_nscore_knn"]["min"],
-        marker="o",
-        label="KNN (relleno)",
-    )
-    plt.plot(
-        agg_pred_por_cluster.index,
-        agg_pred_por_cluster["pred_nscore_xgb"]["min"],
-        marker="o",
-        label="XGBoost (relleno)",
-    )
-    plt.plot(
-        agg_real_por_cluster.index,
-        agg_real_por_cluster["min"],
-        marker="o",
-        label="Original",
-        linestyle="--",
-        color="#7c3aed",
-    )
-    plt.xlabel("Cluster")
-    plt.ylabel("Predicción mínima (normal score)")
-    plt.title("Mínimo de predicción por cluster")
-    plt.legend()
-    plt.grid(True, alpha=0.35)
-    plt.tight_layout()
-    plt.savefig(IMAGENES_DIR / "resultados_ml_minimo_por_cluster.png")
-    plt.show()
-
-    # Máximo por cluster
-    plt.figure(figsize=(8, 5))
-    plt.plot(
-        agg_pred_por_cluster.index,
-        agg_pred_por_cluster["pred_nscore_knn"]["max"],
-        marker="o",
-        label="KNN (relleno)",
-    )
-    plt.plot(
-        agg_pred_por_cluster.index,
-        agg_pred_por_cluster["pred_nscore_xgb"]["max"],
-        marker="o",
-        label="XGBoost (relleno)",
-    )
-    plt.plot(
-        agg_real_por_cluster.index,
-        agg_real_por_cluster["max"],
-        marker="o",
-        label="Original",
-        linestyle="--",
-        color="#7c3aed",
-    )
-    plt.xlabel("Cluster")
-    plt.ylabel("Predicción máxima (normal score)")
-    plt.title("Máximo de predicción por cluster")
-    plt.legend()
-    plt.grid(True, alpha=0.35)
-    plt.tight_layout()
-    plt.savefig(IMAGENES_DIR / "resultados_ml_maximo_por_cluster.png")
+    plt.savefig(IMAGENES_DIR / "resultados_val_real_scatter_real_vs_pred.png")
     plt.show()
 
 # %%
