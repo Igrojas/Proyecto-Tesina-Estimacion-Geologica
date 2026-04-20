@@ -1,7 +1,8 @@
 # %%
 """
-Predicción de Rec_Peso_PND25_(%)_nscore con KNN y XGBoost.
+Predicción de Rec_Peso_PND25_(%)_nscore.
 Features: Este, Norte, Cota (estandarizadas) + get_dummies(cluster_con_nscore).
+Modelos: KNN, XGBoost, SVR, MLPRegressor.
 Misma línea de gráficos que Analisis_EDA / Analisis_cluster.
 """
 
@@ -11,11 +12,12 @@ from pathlib import Path
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-import seaborn as sns
 from sklearn.metrics import mean_squared_error, r2_score
 from sklearn.model_selection import train_test_split
 from sklearn.neighbors import KNeighborsRegressor
 from sklearn.preprocessing import StandardScaler
+from sklearn.svm import SVR
+from sklearn.neural_network import MLPRegressor
 from xgboost import XGBRegressor
 
 warnings.filterwarnings("ignore")
@@ -103,17 +105,19 @@ def plot_real_vs_pred(
 
 
 def compare_models_distrib(
-    r2_knn: list[float],
-    rmse_knn: list[float],
-    r2_xgb: list[float],
-    rmse_xgb: list[float],
+    r2_knn: list[float], rmse_knn: list[float],
+    r2_xgb: list[float], rmse_xgb: list[float],
+    r2_svr: list[float], rmse_svr: list[float],
+    r2_mlp: list[float], rmse_mlp: list[float],
     save_path: Path | None = None,
 ) -> None:
     """Distribución de R² y RMSE por modelo (histogramas)."""
-    fig, axes = plt.subplots(1, 2, figsize=(10, 4))
+    fig, axes = plt.subplots(1, 2, figsize=(12, 4))
     # R²
     axes[0].hist(r2_knn, bins=15, alpha=0.7, color="#2563eb", edgecolor="white", label="KNN")
     axes[0].hist(r2_xgb, bins=15, alpha=0.7, color="#059669", edgecolor="white", label="XGBoost")
+    axes[0].hist(r2_svr, bins=15, alpha=0.7, color="#7c3aed", edgecolor="white", label="SVR")
+    axes[0].hist(r2_mlp, bins=15, alpha=0.7, color="#d97706", edgecolor="white", label="MLP")
     axes[0].set_xlabel("R²")
     axes[0].set_ylabel("Frecuencia")
     axes[0].set_title("Distribución de R²")
@@ -122,6 +126,8 @@ def compare_models_distrib(
     # RMSE
     axes[1].hist(rmse_knn, bins=15, alpha=0.7, color="#2563eb", edgecolor="white", label="KNN")
     axes[1].hist(rmse_xgb, bins=15, alpha=0.7, color="#059669", edgecolor="white", label="XGBoost")
+    axes[1].hist(rmse_svr, bins=15, alpha=0.7, color="#7c3aed", edgecolor="white", label="SVR")
+    axes[1].hist(rmse_mlp, bins=15, alpha=0.7, color="#d97706", edgecolor="white", label="MLP")
     axes[1].set_xlabel("RMSE")
     axes[1].set_ylabel("Frecuencia")
     axes[1].set_title("Distribución de RMSE")
@@ -132,7 +138,6 @@ def compare_models_distrib(
         save_path.parent.mkdir(parents=True, exist_ok=True)
         plt.savefig(save_path)
     plt.show()
-
 
 # --- Ejecución ---
 # %%
@@ -146,30 +151,47 @@ if __name__ == "__main__":
 
     r2_knn, rmse_knn = [], []
     r2_xgb, rmse_xgb = [], []
+    r2_svr, rmse_svr = [], []
+    r2_mlp, rmse_mlp = [], []
 
-    for _ in range(N_ITER):
+    print(f"\nEvaluando {N_ITER} iteraciones con train/test splits aleatorios...")
+    for i in range(N_ITER):
         X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=TEST_SIZE)
 
-        knn = KNeighborsRegressor(n_neighbors=5)
+        knn = KNeighborsRegressor(n_neighbors=5, n_jobs=-1)
         knn.fit(X_train, y_train)
         y_pred_knn = knn.predict(X_test)
         r2_knn.append(r2_score(y_test, y_pred_knn))
         rmse_knn.append(np.sqrt(mean_squared_error(y_test, y_pred_knn)))
 
-        xgb = XGBRegressor()
+        xgb = XGBRegressor(random_state=None, n_jobs=-1)
         xgb.fit(X_train, y_train)
         y_pred_xgb = xgb.predict(X_test)
         r2_xgb.append(r2_score(y_test, y_pred_xgb))
         rmse_xgb.append(np.sqrt(mean_squared_error(y_test, y_pred_xgb)))
 
+        svr = SVR()
+        svr.fit(X_train, y_train)
+        y_pred_svr = svr.predict(X_test)
+        r2_svr.append(r2_score(y_test, y_pred_svr))
+        rmse_svr.append(np.sqrt(mean_squared_error(y_test, y_pred_svr)))
+
+        mlp = MLPRegressor(max_iter=500)
+        mlp.fit(X_train, y_train)
+        y_pred_mlp = mlp.predict(X_test)
+        r2_mlp.append(r2_score(y_test, y_pred_mlp))
+        rmse_mlp.append(np.sqrt(mean_squared_error(y_test, y_pred_mlp)))
+
     # Resumen distribución (solo para el histograma)
-    print("Distribución de métricas (media ± std) — múltiples particiones:")
+    print(f"\nDistribución de métricas (media ± std) — múltiples particiones:")
     print(f"  KNN:     R² = {np.mean(r2_knn):.4f} ± {np.std(r2_knn):.4f}  |  RMSE = {np.mean(rmse_knn):.4f} ± {np.std(rmse_knn):.4f}")
     print(f"  XGBoost: R² = {np.mean(r2_xgb):.4f} ± {np.std(r2_xgb):.4f}  |  RMSE = {np.mean(rmse_xgb):.4f} ± {np.std(rmse_xgb):.4f}")
+    print(f"  SVR:     R² = {np.mean(r2_svr):.4f} ± {np.std(r2_svr):.4f}  |  RMSE = {np.mean(rmse_svr):.4f} ± {np.std(rmse_svr):.4f}")
+    print(f"  MLP:     R² = {np.mean(r2_mlp):.4f} ± {np.std(r2_mlp):.4f}  |  RMSE = {np.mean(rmse_mlp):.4f} ± {np.std(rmse_mlp):.4f}")
 
     # Gráficos: distribución R² y RMSE (iteraciones)
     compare_models_distrib(
-        r2_knn, rmse_knn, r2_xgb, rmse_xgb,
+        r2_knn, rmse_knn, r2_xgb, rmse_xgb, r2_svr, rmse_svr, r2_mlp, rmse_mlp,
         save_path=IMAGENES_DIR / "train_ml_distribucion_R2_RMSE.png",
     )
 
@@ -179,38 +201,56 @@ if __name__ == "__main__":
     )
     n_test = len(y_test)
 
-    knn = KNeighborsRegressor(n_neighbors=5)
+    knn = KNeighborsRegressor(n_neighbors=5, n_jobs=-1)
     knn.fit(X_train, y_train)
     y_pred_knn_final = knn.predict(X_test)
     r2_knn_final = r2_score(y_test, y_pred_knn_final)
     rmse_knn_final = np.sqrt(mean_squared_error(y_test, y_pred_knn_final))
 
-    xgb = XGBRegressor(random_state=RANDOM_STATE)
+    xgb = XGBRegressor(random_state=RANDOM_STATE, n_jobs=-1)
     xgb.fit(X_train, y_train)
     y_pred_xgb_final = xgb.predict(X_test)
     r2_xgb_final = r2_score(y_test, y_pred_xgb_final)
     rmse_xgb_final = np.sqrt(mean_squared_error(y_test, y_pred_xgb_final))
 
+    svr = SVR()
+    svr.fit(X_train, y_train)
+    y_pred_svr_final = svr.predict(X_test)
+    r2_svr_final = r2_score(y_test, y_pred_svr_final)
+    rmse_svr_final = np.sqrt(mean_squared_error(y_test, y_pred_svr_final))
+
+    mlp = MLPRegressor(max_iter=500, random_state=RANDOM_STATE)
+    mlp.fit(X_train, y_train)
+    y_pred_mlp_final = mlp.predict(X_test)
+    r2_mlp_final = r2_score(y_test, y_pred_mlp_final)
+    rmse_mlp_final = np.sqrt(mean_squared_error(y_test, y_pred_mlp_final))
+
     print("\nModelo único (seed=%d) — métricas para tabla:" % RANDOM_STATE)
     print(f"  N (test) = {n_test}")
     print(f"  KNN:     R² = {r2_knn_final:.4f}  |  RMSE = {rmse_knn_final:.4f}")
     print(f"  XGBoost: R² = {r2_xgb_final:.4f}  |  RMSE = {rmse_xgb_final:.4f}")
+    print(f"  SVR:     R² = {r2_svr_final:.4f}  |  RMSE = {rmse_svr_final:.4f}")
+    print(f"  MLP:     R² = {r2_mlp_final:.4f}  |  RMSE = {rmse_mlp_final:.4f}")
 
     # Guardar métricas en formato tabla (sin std: un solo modelo)
     df_metricas = pd.DataFrame([
         {"modelo": "KNN", "n": n_test, "R2": r2_knn_final, "RMSE": rmse_knn_final},
         {"modelo": "XGBoost", "n": n_test, "R2": r2_xgb_final, "RMSE": rmse_xgb_final},
+        {"modelo": "SVR", "n": n_test, "R2": r2_svr_final, "RMSE": rmse_svr_final},
+        {"modelo": "MLP", "n": n_test, "R2": r2_mlp_final, "RMSE": rmse_mlp_final},
     ])
     OUTPUT_METRICAS_ML_PATH.parent.mkdir(parents=True, exist_ok=True)
     df_metricas.to_csv(OUTPUT_METRICAS_ML_PATH, index=False)
     print(f"Métricas guardadas en: {OUTPUT_METRICAS_ML_PATH}")
 
     # Real vs predicho (modelo único con seed)
-    fig, axes = plt.subplots(1, 2, figsize=(10, 5))
+    fig, axes = plt.subplots(1, 4, figsize=(20, 5))
     plot_real_vs_pred(y_test.values, y_pred_knn_final, "KNN", ax=axes[0])
     plot_real_vs_pred(y_test.values, y_pred_xgb_final, "XGBoost", ax=axes[1])
+    plot_real_vs_pred(y_test.values, y_pred_svr_final, "SVR", ax=axes[2])
+    plot_real_vs_pred(y_test.values, y_pred_mlp_final, "MLP", ax=axes[3])
     plt.tight_layout()
-    plt.savefig(IMAGENES_DIR / "train_ml_real_vs_predicho_KNN_XGBoost.png")
+    plt.savefig(IMAGENES_DIR / "train_ml_real_vs_predicho.png")
     plt.show()
 
     # --- Predicción sobre puntos de VALIDACIÓN (modelo ya entrenado arriba) ---
@@ -228,13 +268,16 @@ if __name__ == "__main__":
 
             y_pred_knn_val = knn.predict(X_val)
             y_pred_xgb_val = xgb.predict(X_val)
+            y_pred_svr_val = svr.predict(X_val)
+            y_pred_mlp_val = mlp.predict(X_val)
 
             df_val["pred_nscore_knn"] = y_pred_knn_val
             df_val["pred_nscore_xgb"] = y_pred_xgb_val
+            df_val["pred_nscore_svr"] = y_pred_svr_val
+            df_val["pred_nscore_mlp"] = y_pred_mlp_val
 
             OUTPUT_DF_VAL_PATH.parent.mkdir(parents=True, exist_ok=True)
             df_val.to_csv(OUTPUT_DF_VAL_PATH, index=False)
             print(f"DataFrame con predicciones de validación guardado en: {OUTPUT_DF_VAL_PATH}")
-
 
 # %%

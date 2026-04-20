@@ -99,11 +99,15 @@ def plot_drift_comparison(
         dr_val_real = drift_by_bins(df_val, coord, VALUE_COL_VAL_REAL, n_bins=n_bins)
         dr_knn = drift_by_bins(df_val, coord, "pred_real_knn", n_bins=n_bins)
         dr_xgb = drift_by_bins(df_val, coord, "pred_real_xgb", n_bins=n_bins)
+        dr_svr = drift_by_bins(df_val, coord, "pred_real_svr", n_bins=n_bins)
+        dr_mlp = drift_by_bins(df_val, coord, "pred_real_mlp", n_bins=n_bins)
         
         ax.plot(dr_orig["coord_center"], dr_orig["mean"], "o-", linewidth=1, markersize=4, color="#7c3aed", label="Orig. (Train)")
         ax.plot(dr_val_real["coord_center"], dr_val_real["mean"], "s-", linewidth=1, markersize=4, color="#ef4444", label="Val. (Real)")
         ax.plot(dr_knn["coord_center"], dr_knn["mean"], "--", linewidth=1, color="#2563eb", label="Pred. KNN")
         ax.plot(dr_xgb["coord_center"], dr_xgb["mean"], "--", linewidth=1, color="#059669", label="Pred. XGBoost")
+        ax.plot(dr_svr["coord_center"], dr_svr["mean"], "--", linewidth=1, color="#7c3aed", label="Pred. SVR")
+        ax.plot(dr_mlp["coord_center"], dr_mlp["mean"], "--", linewidth=1, color="#d97706", label="Pred. MLP")
         
         ax.set_xlabel(x_label)
         ax.set_ylabel("Promedio (%)")
@@ -152,7 +156,7 @@ def export_tabla_validacion_tesina(
     y_real = df_val[VALUE_COL_VAL_REAL]
     
     metrics = []
-    for model in ["knn", "xgb"]:
+    for model in ["knn", "xgb", "svr", "mlp"]:
         y_pred = df_val[f"pred_real_{model}"]
         r2 = r2_score(y_real, y_pred)
         rmse = np.sqrt(mean_squared_error(y_real, y_pred))
@@ -200,7 +204,7 @@ if __name__ == "__main__":
     target_transformer.fit(df_train_ref[VALUE_COL_ORIG_REAL].values.reshape(-1, 1))
 
     # C) Des-transformar predicciones de validación
-    for model in ["knn", "xgb"]:
+    for model in ["knn", "xgb", "svr", "mlp"]:
         nscore_preds = df_val[f"pred_nscore_{model}"].values.reshape(-1, 1)
         real_preds = target_transformer.inverse_transform(nscore_preds)
         df_val[f"pred_real_{model}"] = real_preds.flatten()
@@ -217,6 +221,10 @@ if __name__ == "__main__":
                          save_path=IMAGENES_DIR / "resultados_val_real_3d_knn.png")
     plot_3d_proportional(df_val, "pred_real_xgb", "Validación: Predicción XGBoost (%)", "Pred. Real (%)", 
                          save_path=IMAGENES_DIR / "resultados_val_real_3d_xgb.png")
+    plot_3d_proportional(df_val, "pred_real_svr", "Validación: Predicción SVR (%)", "Pred. Real (%)", 
+                         save_path=IMAGENES_DIR / "resultados_val_real_3d_svr.png")
+    plot_3d_proportional(df_val, "pred_real_mlp", "Validación: Predicción MLP (%)", "Pred. Real (%)", 
+                         save_path=IMAGENES_DIR / "resultados_val_real_3d_mlp.png")
 
     # 3) Comparación de Deriva (Drift Analysis) en UNIDADES REALES
     plot_drift_comparison(df_orig, df_val, COORD_COLS, coord_labels=COORD_LABELS,
@@ -227,6 +235,8 @@ if __name__ == "__main__":
     plt.hist(df_val[VALUE_COL_VAL_REAL], bins=30, alpha=0.5, label="Val. Real (recpe)", color="#ef4444", density=True)
     plt.hist(df_val["pred_real_knn"], bins=30, alpha=0.5, label="Pred. KNN (%)", color="#2563eb", density=True)
     plt.hist(df_val["pred_real_xgb"], bins=30, alpha=0.5, label="Pred. XGBoost (%)", color="#059669", density=True)
+    plt.hist(df_val["pred_real_svr"], bins=30, alpha=0.5, label="Pred. SVR (%)", color="#7c3aed", density=True)
+    plt.hist(df_val["pred_real_mlp"], bins=30, alpha=0.5, label="Pred. MLP (%)", color="#d97706", density=True)
     plt.title("Distribución de Valores Reales: Real vs Predicho (%)")
     plt.xlabel("Recuperación (%)")
     plt.ylabel("Densidad")
@@ -235,8 +245,8 @@ if __name__ == "__main__":
     plt.show()
 
     # 5) Scatter Real vs Predicho en UNIDADES REALES
-    fig, axes = plt.subplots(1, 2, figsize=(12, 5))
-    for ax, model, color in zip(axes, ["knn", "xgb"], ["#2563eb", "#059669"]):
+    fig, axes = plt.subplots(1, 4, figsize=(24, 5))
+    for ax, model, color in zip(axes, ["knn", "xgb", "svr", "mlp"], ["#2563eb", "#059669", "#7c3aed", "#d97706"]):
         ax.scatter(df_val[VALUE_COL_VAL_REAL], df_val[f"pred_real_{model}"], alpha=0.4, s=10, color=color)
         min_v = min(df_val[VALUE_COL_VAL_REAL].min(), df_val[f"pred_real_{model}"].min())
         max_v = max(df_val[VALUE_COL_VAL_REAL].max(), df_val[f"pred_real_{model}"].max())
@@ -248,5 +258,7 @@ if __name__ == "__main__":
     plt.tight_layout()
     plt.savefig(IMAGENES_DIR / "resultados_val_real_scatter_real_vs_pred.png")
     plt.show()
+
+# %%
 
 # %%
