@@ -16,6 +16,8 @@ from IPython.display import display
 from scipy import stats
 from sklearn.preprocessing import QuantileTransformer
 
+from config_figuras_tesina import setup_figuras_tesina, set_proportional_aspect
+
 warnings.filterwarnings("ignore")
 
 # --- Configuración (ajustar a tu archivo) ---
@@ -31,31 +33,6 @@ OUTPUT_PATH = "data/processed/df_rec_peso_pnd25.xlsx"
 IMAGENES_DIR = Path("imagenes")
 # Valor sentinela: filas con este valor se eliminan (trazabilidad de limpieza)
 SENTINEL_VALUE = -99
-
-
-def setup_report_style() -> None:
-    """
-    Configura el estilo de matplotlib para figuras de informe/tesina.
-    Llamar al inicio del script o antes de generar figuras.
-    """
-    plt.rcParams.update({
-        "figure.dpi": 150,
-        "savefig.dpi": 300,
-        "savefig.bbox": "tight",
-        "font.family": "sans-serif",
-        "font.size": 11,
-        "axes.titlesize": 12,
-        "axes.labelsize": 11,
-        "xtick.labelsize": 10,
-        "ytick.labelsize": 10,
-        "legend.fontsize": 10,
-        "axes.grid": True,
-        "grid.alpha": 0.35,
-        "axes.spines.top": False,
-        "axes.spines.right": False,
-        "figure.facecolor": "white",
-        "axes.facecolor": "white",
-    })
 
 
 def load_and_select(
@@ -261,15 +238,16 @@ def plot_3d(
     """Scatter 3D coloreado por variable. Formato para informe."""
     from mpl_toolkits.mplot3d import Axes3D  # noqa: F401
 
-    fig = plt.figure(figsize=(8, 6))
+    fig = plt.figure(figsize=(10, 8))
     ax = fig.add_subplot(111, projection="3d")
-    sc = ax.scatter(df[x_col], df[y_col], df[z_col], c=df[color_col], cmap=cmap, s=25, alpha=0.7)
+    sc = ax.scatter(df[x_col], df[y_col], df[z_col], c=df[color_col], cmap=cmap, s=15, alpha=0.7)
     ax.set_xlabel(xlabel or x_col)
     ax.set_ylabel(ylabel or y_col)
     ax.set_zlabel(zlabel or z_col)
     if title:
         ax.set_title(title)
-    plt.colorbar(sc, ax=ax, shrink=0.5, pad=0.12, label=color_label or color_col)
+    set_proportional_aspect(ax, df, x_col, y_col, z_col)
+    plt.colorbar(sc, ax=ax, shrink=0.5, pad=0.1, label=color_label or color_col)
     plt.tight_layout()
     if save_path:
         save_path.parent.mkdir(parents=True, exist_ok=True)
@@ -310,81 +288,85 @@ def plot_2d_projections(
 
 # --- Ejecución con configuración por defecto ---
 # %%
-if __name__ == "__main__":
-    setup_report_style()
-    IMAGENES_DIR.mkdir(parents=True, exist_ok=True)
-    coord_labels = COORD_LABELS or COORDS  # etiquetas para ejes en figuras
+setup_figuras_tesina()
+IMAGENES_DIR.mkdir(parents=True, exist_ok=True)
+coord_labels = COORD_LABELS or COORDS  # etiquetas para ejes en figuras
 
-    df = load_and_select(DATA_PATH, COORDS, TARGET)
-    list_cols = COORDS + [TARGET]
-    print("Columnas usadas:", list_cols)
-    print("Variable en estudio (etiqueta):", TARGET_LABEL)
+df = load_and_select(DATA_PATH, COORDS, TARGET)
+list_cols = COORDS + [TARGET]
+print("Columnas usadas:", list_cols)
+print("Variable en estudio (etiqueta):", TARGET_LABEL)
 
-    # Eliminar valor sentinela -99 (trazabilidad en SENTINEL_VALUE y drop_sentinel_values)
-    df = drop_sentinel_values(df, [TARGET], sentinel=SENTINEL_VALUE)
+# Filtrar Norte > 26000
+n_antes = len(df)
+df = df[df["Norte"] <= 26000].copy()
+print(f"Filtro espacial (Norte <= 26000): se eliminaron {n_antes - len(df)} registros. Quedan: {len(df)}")
 
-    summary_quality(df)
-    display(df)
+# Eliminar valor sentinela -99 (trazabilidad en SENTINEL_VALUE y drop_sentinel_values)
+df = drop_sentinel_values(df, [TARGET], sentinel=SENTINEL_VALUE)
 
-    # %%
-    plot_histogram(
-        df, TARGET, bins=20, kde=True,
-        xlabel=TARGET_LABEL,
-        title=f"Distribución de {TARGET_LABEL}",
-        save_path=IMAGENES_DIR / "eda_histograma_distribucion.png",
-    )
+summary_quality(df)
+display(df)
 
-    # %%
-    nscore_col = add_normal_score(df, TARGET)
-    print_normal_score_stats(df, TARGET, nscore_col)
-    plot_normal_score_diagnostic(
-        df, TARGET, nscore_col, value_label=TARGET_LABEL,
-        save_path=IMAGENES_DIR / "eda_diagnostico_normal_score.png",
-    )
+# %%
+plot_histogram(
+    df, TARGET, bins=20, kde=True,
+    xlabel=TARGET_LABEL,
+    title=f"Distribución de {TARGET_LABEL}",
+    save_path=IMAGENES_DIR / "eda_histograma_distribucion.png",
+)
 
-    # %%
-    plot_drift(
-        df, COORDS, TARGET, n_bins=20,
-        coord_labels=coord_labels,
-        value_label=TARGET_LABEL,
-        save_path=IMAGENES_DIR / "eda_deriva_coordenadas.png",
-    )
+# %%
+nscore_col = add_normal_score(df, TARGET)
+print_normal_score_stats(df, TARGET, nscore_col)
+plot_normal_score_diagnostic(
+    df, TARGET, nscore_col, value_label=TARGET_LABEL,
+    save_path=IMAGENES_DIR / "eda_diagnostico_normal_score.png",
+)
 
-     # %%
-    plot_3d(
-        df, COORDS[0], COORDS[1], COORDS[2], TARGET,
-        title=f"Distribución espacial — coloreado por {TARGET_LABEL}",
-        xlabel=coord_labels[0], ylabel=coord_labels[1], zlabel=coord_labels[2],
-        color_label=TARGET_LABEL,
-        save_path=IMAGENES_DIR / "eda_3d_espacial_target.png",
-    )
-    plot_3d(
-        df, COORDS[0], COORDS[1], COORDS[2], nscore_col,
-        title=f"Distribución espacial — coloreado por normal score ({TARGET_LABEL})",
-        xlabel=coord_labels[0], ylabel=coord_labels[1], zlabel=coord_labels[2],
-        color_label=f"{TARGET_LABEL} (normal score)",
-        save_path=IMAGENES_DIR / "eda_3d_espacial_nscore.png",
-    )
+# %%
+plot_drift(
+    df, COORDS, TARGET, n_bins=20,
+    coord_labels=coord_labels,
+    value_label=TARGET_LABEL,
+    save_path=IMAGENES_DIR / "eda_deriva_coordenadas.png",
+)
 
-    # %%
-    plot_2d_projections(
-        df, COORDS, TARGET,
-        suptitle=f"Proyecciones 2D — {TARGET_LABEL}",
-        coord_labels=coord_labels,
-        color_label=TARGET_LABEL,
-        save_path=IMAGENES_DIR / "eda_proyecciones_2d_target.png",
-    )
-    plot_2d_projections(
-        df, COORDS, nscore_col,
-        suptitle=f"Proyecciones 2D — {TARGET_LABEL} (normal score)",
-        coord_labels=coord_labels,
-        color_label=f"{TARGET_LABEL} (normal score)",
-        save_path=IMAGENES_DIR / "eda_proyecciones_2d_nscore.png",
-    )
+# %%
+plot_3d(
+    df, COORDS[0], COORDS[1], COORDS[2], TARGET,
+    title=f"Distribución espacial — coloreado por {TARGET_LABEL}",
+    xlabel=coord_labels[0], ylabel=coord_labels[1], zlabel=coord_labels[2],
+    color_label=TARGET_LABEL,
+    save_path=IMAGENES_DIR / "eda_3d_espacial_target.png",
+)
+plot_3d(
+    df, COORDS[0], COORDS[1], COORDS[2], nscore_col,
+    title=f"Distribución espacial — coloreado por normal score ({TARGET_LABEL})",
+    xlabel=coord_labels[0], ylabel=coord_labels[1], zlabel=coord_labels[2],
+    color_label=f"{TARGET_LABEL} (normal score)",
+    save_path=IMAGENES_DIR / "eda_3d_espacial_nscore.png",
+)
 
-    # %%
-    Path(OUTPUT_PATH).parent.mkdir(parents=True, exist_ok=True)
-    df.to_excel(OUTPUT_PATH, index=False)
-    print(f"Guardado: {OUTPUT_PATH}")
+# %%
+plot_2d_projections(
+    df, COORDS, TARGET,
+    suptitle=f"Proyecciones 2D — {TARGET_LABEL}",
+    coord_labels=coord_labels,
+    color_label=TARGET_LABEL,
+    save_path=IMAGENES_DIR / "eda_proyecciones_2d_target.png",
+)
+plot_2d_projections(
+    df, COORDS, nscore_col,
+    suptitle=f"Proyecciones 2D — {TARGET_LABEL} (normal score)",
+    coord_labels=coord_labels,
+    color_label=f"{TARGET_LABEL} (normal score)",
+    save_path=IMAGENES_DIR / "eda_proyecciones_2d_nscore.png",
+)
+
+# %%
+Path(OUTPUT_PATH).parent.mkdir(parents=True, exist_ok=True)
+df.to_excel(OUTPUT_PATH, index=False)
+print(f"Guardado: {OUTPUT_PATH}")
 
 # %%

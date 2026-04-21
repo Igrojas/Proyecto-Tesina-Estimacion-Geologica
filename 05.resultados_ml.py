@@ -11,6 +11,7 @@ from pathlib import Path
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
+import seaborn as sns
 from sklearn.metrics import mean_squared_error, r2_score
 from sklearn.preprocessing import QuantileTransformer
 
@@ -20,6 +21,8 @@ warnings.filterwarnings("ignore")
 INPUT_DF_VAL_PATH = Path("data/processed/df_validacion_predicciones.csv")
 INPUT_TRAIN_DATA_PATH = Path("data/processed/cluster/clusters_df_con_nscore.csv")
 INPUT_COMBINED_PATH = Path("data/processed/cluster/puntos_originales_y_validacion.csv")
+INPUT_MOD_VALIDOS_PATH = Path("data/validacion/modelo_validos.csv")
+OUTPUT_TABLA_ESTADISTICAS_PATH = Path("data/processed/estadisticas_clusters_vs_ue.csv")
 OUTPUT_TABLA_TESINA_PATH = Path("data/processed/tabla_resultados_ml_tesina.xlsx")
 OUTPUT_TABLA_MODELOS_PATH = Path("data/processed/tabla_resultados_modelos_tesina.xlsx")
 IMAGENES_DIR = Path("imagenes")
@@ -30,7 +33,13 @@ ORIGEN_COL = "origen"
 VALUE_COL_ORIG_REAL = "Rec_Peso_PND25_(%)"
 VALUE_COL_ORIG_NSCORE = "Rec_Peso_PND25_(%)_nscore"
 VALUE_COL_VAL_REAL = "recpe"  # Columna real en datos de validación
+CLUSTER_COL_VAL = "ue"
 VALUE_LABEL = "Recuperación en peso (%)"
+
+CLUSTER_PALETTE = [
+    "#2563eb", "#dc2626", "#059669", "#d97706",
+    "#7c3aed", "#0d9488", "#ea580c", "#4f46e5",
+]
 
 
 def setup_report_style() -> None:
@@ -174,6 +183,54 @@ def export_tabla_validacion_tesina(
     print(f"Métricas de validación real guardadas en: {output_path}")
 
 
+def cv(x: np.ndarray) -> float:
+    """Calcula el Coeficiente de Variación."""
+    x = x[~np.isnan(x)]
+    if len(x) == 0:
+        return np.nan
+    mean_val = np.mean(x)
+    return np.std(x) / mean_val if mean_val != 0 else np.nan
+
+def comparacion_estimacion_vs_validacion_por_ue(df_val: pd.DataFrame, save_dir: Path) -> None:
+    """Compara estadísticamente las estimaciones ML vs el valor Real dentro del dataset de Validación, separado por UE."""
+    df_val_ue = df_val.dropna(subset=[CLUSTER_COL_VAL, VALUE_COL_VAL_REAL]).copy()
+    df_val_ue[CLUSTER_COL_VAL] = df_val_ue[CLUSTER_COL_VAL].astype(int)
+    
+    ues = sorted(df_val_ue[CLUSTER_COL_VAL].unique())
+    
+    fuentes = {
+        "Real (Validación)": VALUE_COL_VAL_REAL,
+        "Est. KNN": "pred_real_knn",
+        "Est. XGBoost": "pred_real_xgb",
+        "Est. SVR": "pred_real_svr",
+        "Est. MLP": "pred_real_mlp"
+    }
+
+    # Tabla Estadísticas
+    stats_list = []
+    for ue in ues:
+        data_subset = df_val_ue[df_val_ue[CLUSTER_COL_VAL] == ue]
+        for fuente_nombre, col_fuente in fuentes.items():
+            if col_fuente in data_subset.columns:
+                data = data_subset[col_fuente].values
+                stats_list.append({
+                    "UE": ue,
+                    "Fuente": fuente_nombre,
+                    "N": len(data),
+                    "Media (%)": np.mean(data),
+                    "Desv.Std (%)": np.std(data),
+                    "CV": cv(data),
+                    "Min (%)": np.min(data),
+                    "Max (%)": np.max(data)
+                })
+    
+    df_stats = pd.DataFrame(stats_list)
+    OUTPUT_TABLA_ESTADISTICAS_PATH.parent.mkdir(parents=True, exist_ok=True)
+    df_stats.to_csv(OUTPUT_TABLA_ESTADISTICAS_PATH, index=False)
+    print("\n--- Estadísticas por UE: Estimaciones ML vs Validación Real ---")
+    print(df_stats.to_string(index=False, float_format=lambda x: f"{x:.4f}"))
+
+
 # --- Ejecución ---
 # %%
 if __name__ == "__main__":
@@ -187,6 +244,8 @@ if __name__ == "__main__":
     df_val = pd.read_csv(INPUT_DF_VAL_PATH)
     df_full = pd.read_csv(INPUT_COMBINED_PATH)
     df_orig = df_full[df_full[ORIGEN_COL] == "original"].copy()
+
+
 
     # B) Re-instanciar y entrenar el transformer para des-transformar (Normal Score -> %)
     # Cargamos el archivo original de entrenamiento que tiene tanto raw como nscore
@@ -210,6 +269,9 @@ if __name__ == "__main__":
         df_val[f"pred_real_{model}"] = real_preds.flatten()
 
     print(f"Cargados {len(df_val)} puntos de validación. Predicciones des-transformadas a unidades reales (%).")
+
+    # 0) NUEVO: Validar Estimaciones ML vs Validación Real agrupados por clúster (UE)
+    comparacion_estimacion_vs_validacion_por_ue(df_val, IMAGENES_DIR)
 
     # 1) Métricas de Validación en UNIDADES REALES
     export_tabla_validacion_tesina(df_val, OUTPUT_TABLA_MODELOS_PATH)
@@ -258,7 +320,5 @@ if __name__ == "__main__":
     plt.tight_layout()
     plt.savefig(IMAGENES_DIR / "resultados_val_real_scatter_real_vs_pred.png")
     plt.show()
-
-# %%
 
 # %%

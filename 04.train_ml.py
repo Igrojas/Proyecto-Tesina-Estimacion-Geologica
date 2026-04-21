@@ -20,6 +20,8 @@ from sklearn.svm import SVR
 from sklearn.neural_network import MLPRegressor
 from xgboost import XGBRegressor
 
+from config_figuras_tesina import setup_figuras_tesina
+
 warnings.filterwarnings("ignore")
 
 # --- Configuración ---
@@ -37,27 +39,6 @@ ORIGEN_COL = "origen"
 TEST_SIZE = 0.2
 N_ITER = 20  # iteraciones para obtener distribución de R² y RMSE (histograma)
 RANDOM_STATE = 42  # seed para entrenamiento único (tabla y modelo final)
-
-
-def setup_report_style() -> None:
-    """Estilo de figuras (misma línea que Analisis_EDA / Analisis_cluster)."""
-    plt.rcParams.update({
-        "figure.dpi": 150,
-        "savefig.dpi": 300,
-        "savefig.bbox": "tight",
-        "font.family": "sans-serif",
-        "font.size": 11,
-        "axes.titlesize": 12,
-        "axes.labelsize": 11,
-        "xtick.labelsize": 10,
-        "ytick.labelsize": 10,
-        "axes.grid": True,
-        "grid.alpha": 0.35,
-        "axes.spines.top": False,
-        "axes.spines.right": False,
-        "figure.facecolor": "white",
-        "axes.facecolor": "white",
-    })
 
 
 def build_X(
@@ -142,7 +123,7 @@ def compare_models_distrib(
 # --- Ejecución ---
 # %%
 if __name__ == "__main__":
-    setup_report_style()
+    setup_figuras_tesina()
     IMAGENES_DIR.mkdir(parents=True, exist_ok=True)
 
     df = pd.read_csv(INPUT_PATH)
@@ -158,7 +139,7 @@ if __name__ == "__main__":
     for i in range(N_ITER):
         X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=TEST_SIZE)
 
-        knn = KNeighborsRegressor(n_neighbors=5, n_jobs=-1)
+        knn = KNeighborsRegressor(n_neighbors=10, n_jobs=-1)
         knn.fit(X_train, y_train)
         y_pred_knn = knn.predict(X_test)
         r2_knn.append(r2_score(y_test, y_pred_knn))

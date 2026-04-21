@@ -19,6 +19,8 @@ from sklearn.cluster import KMeans
 from sklearn.metrics import silhouette_score
 from sklearn.preprocessing import StandardScaler
 
+from config_figuras_tesina import setup_figuras_tesina, set_proportional_aspect
+
 warnings.filterwarnings("ignore")
 
 # Paleta con buen contraste y aspecto profesional (tonos medios, no oscuros)
@@ -40,7 +42,7 @@ TARGET = "Rec_Peso_PND25_(%)"
 NSCORE_SUFFIX = "_nscore"
 TARGET_LABEL = "Recuperación en peso (%)"
 COORD_LABELS = ["Este (m)", "Norte (m)", "Cota (m)"]
-N_CLUSTERS = 5
+N_CLUSTERS = 3
 # Rango de k para explorar (método del codo + silueta)
 K_RANGE = (2, 11)  # prueba k desde 2 hasta k_max - 1
 # Ejecutar análisis: con nscore, sin nscore, o ambos
@@ -54,31 +56,9 @@ def _cluster_cmap_norm(n_clusters: int) -> Tuple[ListedColormap, BoundaryNorm]:
     """Colormap y norma discretos para que la colorbar muestre solo n_clusters."""
     colors = CLUSTER_PALETTE[:n_clusters]
     cmap = ListedColormap(colors)
-    boundaries = np.arange(n_clusters + 1) - 0.5
+    boundaries = np.arange(1, n_clusters + 2) - 0.5
     norm = BoundaryNorm(boundaries, n_clusters)
     return cmap, norm
-
-
-def setup_report_style() -> None:
-    """Estilo de figuras para informe/tesina (misma línea que Analisis_EDA.py)."""
-    plt.rcParams.update({
-        "figure.dpi": 150,
-        "savefig.dpi": 300,
-        "savefig.bbox": "tight",
-        "font.family": "sans-serif",
-        "font.size": 11,
-        "axes.titlesize": 12,
-        "axes.labelsize": 11,
-        "xtick.labelsize": 10,
-        "ytick.labelsize": 10,
-        "legend.fontsize": 10,
-        "axes.grid": True,
-        "grid.alpha": 0.35,
-        "axes.spines.top": False,
-        "axes.spines.right": False,
-        "figure.facecolor": "white",
-        "axes.facecolor": "white",
-    })
 
 
 def load_processed_data(path: str | Path) -> pd.DataFrame:
@@ -107,7 +87,7 @@ def fit_clusters(
     kmeans = KMeans(n_clusters=n_clusters, random_state=random_state)
     labels = kmeans.fit_predict(X)
     out = df.copy()
-    out[cluster_col] = labels
+    out[cluster_col] = labels + 1  # Enumerar desde 1 hasta n_clusters
     return out
 
 
@@ -216,11 +196,12 @@ def plot_cluster_summary(
 
     # Eje X = media, Eje Y = desviación estándar (un punto por cluster)
     stats_cluster = df.groupby(cluster_col)[col].agg(["mean", "std"]).reset_index()
-    for c in range(n_clusters):
+    for c in range(1, n_clusters + 1):
+        idx_color = c - 1
         row = stats_cluster[stats_cluster[cluster_col] == c].iloc[0]
         axes[1].scatter(
             row["mean"], row["std"],
-            color=palette[c], s=80, edgecolor="black", linewidths=1,
+            color=palette[idx_color], s=80, edgecolor="black", linewidths=1,
             label=f"Cluster {c}", zorder=5,
         )
     axes[1].set_title("Efecto por cluster (media vs desv. estándar)")
@@ -231,7 +212,8 @@ def plot_cluster_summary(
 
     # Gráfico de probabilidad normal: X = col (rango según variable: nscore ~[-3,3] o target en unidades reales)
     y_ticks, y_labels = _probability_scale_ticks()
-    for c in range(n_clusters):
+    for c in range(1, n_clusters + 1):
+        idx_color = c - 1
         data = np.sort(df.loc[df[cluster_col] == c, col].values)
         n = len(data)
         if n == 0:
@@ -240,7 +222,7 @@ def plot_cluster_summary(
         y_plot = norm.ppf(p)
         axes[2].scatter(
             data, y_plot,
-            color=palette[c], s=12, alpha=0.7, edgecolors="black", linewidths=0.3,
+            color=palette[idx_color], s=12, alpha=0.7, edgecolors="black", linewidths=0.3,
             label=f"Cluster {c}",
         )
     axes[2].set_title("Gráfico de probabilidad normal")
@@ -273,18 +255,21 @@ def plot_clusters_3d(
     xl = coord_labels or coord_cols
     k = n_clusters or int(df[cluster_col].nunique())
     cmap, norm = _cluster_cmap_norm(k)
-    fig = plt.figure(figsize=(8, 6))
+    fig = plt.figure(figsize=(10, 8))
     ax = fig.add_subplot(111, projection="3d")
     sc = ax.scatter(
         df[coord_cols[0]], df[coord_cols[1]], df[coord_cols[2]],
-        c=df[cluster_col], cmap=cmap, norm=norm, s=25, alpha=0.7,
+        c=df[cluster_col], cmap=cmap, norm=norm, s=15, alpha=0.7,
     )
     ax.set_xlabel(xl[0])
     ax.set_ylabel(xl[1])
     ax.set_zlabel(xl[2])
     if title:
         ax.set_title(title)
-    plt.colorbar(sc, ax=ax, shrink=0.5, pad=0.12, label="Cluster", ticks=np.arange(k))
+    
+    set_proportional_aspect(ax, df, coord_cols[0], coord_cols[1], coord_cols[2])
+    
+    plt.colorbar(sc, ax=ax, shrink=0.5, pad=0.1, label="Cluster", ticks=np.arange(1, k + 1))
     plt.tight_layout()
     if save_path:
         save_path.parent.mkdir(parents=True, exist_ok=True)
@@ -447,58 +432,59 @@ def run_clustering_pipeline(
 
 # --- Ejecución ---
 # %%
-if __name__ == "__main__":
-    setup_report_style()
-    IMAGENES_DIR.mkdir(parents=True, exist_ok=True)
-    coord_labels = COORD_LABELS or COORDS
-    nscore_col = f"{TARGET}{NSCORE_SUFFIX}"
-    k_min, k_max = K_RANGE
+setup_figuras_tesina()
+IMAGENES_DIR.mkdir(parents=True, exist_ok=True)
+coord_labels = COORD_LABELS or COORDS
+nscore_col = f"{TARGET}{NSCORE_SUFFIX}"
+k_min, k_max = K_RANGE
 
-    df = load_processed_data(INPUT_PATH)
-    if nscore_col not in df.columns:
-        raise ValueError(
-            f"Columna '{nscore_col}' no encontrada. Ejecuta antes Analisis_EDA.py."
-        )
-    print("Columnas cargadas:", list(df.columns))
-    print("Variable en estudio:", TARGET_LABEL, "| Clusters:", N_CLUSTERS)
-
-    if RUN_CON_NSCORE:
-        feature_cols_con = COORDS + [nscore_col]
-        df = run_clustering_pipeline(
-            df, feature_cols_con, "cluster_con_nscore", "Con nscore (coords + variable)",
-            coord_labels, nscore_col, TARGET, N_CLUSTERS, K_RANGE, "con_nscore",
-        )
-
-    if RUN_SIN_NSCORE:
-        feature_cols_sin = COORDS
-        df = run_clustering_pipeline(
-            df, feature_cols_sin, "cluster_sin_nscore", "Sin nscore (solo coords)",
-            coord_labels, nscore_col, TARGET, N_CLUSTERS, K_RANGE, "sin_nscore",
-        )
-    # df tiene ahora cluster_con_nscore y/o cluster_sin_nscore según lo ejecutado
-
-    # %%
-    OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
-    if RUN_CON_NSCORE:
-        out_con = OUTPUT_DIR / "clusters_df_con_nscore.csv"
-        df.to_csv(out_con, index=False)
-        print(f"Guardado (con nscore): {out_con}")
-    if RUN_SIN_NSCORE:
-        out_sin = OUTPUT_DIR / "clusters_df_sin_nscore.csv"
-        df.to_csv(out_sin, index=False)
-        print(f"Guardado (sin nscore): {out_sin}")
-
-    # %%
-    # Deriva para un cluster concreto (elegir cluster_col según el modo que quieras analizar)
-    CLUSTER_PARA_DERIVA = 0
-    cluster_col_deriva = "cluster_con_nscore" if RUN_CON_NSCORE else "cluster_sin_nscore"
-    df_sub = df[df[cluster_col_deriva] == CLUSTER_PARA_DERIVA].copy()
-    plot_drift(
-        df_sub, COORDS, TARGET, n_bins=20,
-        coord_labels=coord_labels,
-        value_label=TARGET_LABEL,
-        title_prefix=f"Deriva (cluster {CLUSTER_PARA_DERIVA}, {cluster_col_deriva})",
-        save_path=IMAGENES_DIR / "cluster_deriva_cluster0.png",
+df = load_processed_data(INPUT_PATH)
+if nscore_col not in df.columns:
+    raise ValueError(
+        f"Columna '{nscore_col}' no encontrada. Ejecuta antes Analisis_EDA.py."
     )
+print("Columnas cargadas:", list(df.columns))
+print("Variable en estudio:", TARGET_LABEL, "| Clusters:", N_CLUSTERS)
+
+if RUN_CON_NSCORE:
+    feature_cols_con = COORDS + [nscore_col]
+    df = run_clustering_pipeline(
+        df, feature_cols_con, "cluster_con_nscore", "Con nscore (coords + variable)",
+        coord_labels, nscore_col, TARGET, N_CLUSTERS, K_RANGE, "con_nscore",
+    )
+
+if RUN_SIN_NSCORE:
+    # El usuario solicitó que se use coordenadas + la variable de recuperación (TARGET)
+    # para los datos NO transformados también.
+    feature_cols_sin = COORDS + [TARGET]
+    df = run_clustering_pipeline(
+        df, feature_cols_sin, "cluster_sin_nscore", "Sin nscore (coords + variable original)",
+        coord_labels, nscore_col, TARGET, N_CLUSTERS, K_RANGE, "sin_nscore",
+    )
+# df tiene ahora cluster_con_nscore y/o cluster_sin_nscore según lo ejecutado
+
+# %%
+OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+if RUN_CON_NSCORE:
+    out_con = OUTPUT_DIR / "clusters_df_con_nscore.csv"
+    df.to_csv(out_con, index=False)
+    print(f"Guardado (con nscore): {out_con}")
+if RUN_SIN_NSCORE:
+    out_sin = OUTPUT_DIR / "clusters_df_sin_nscore.csv"
+    df.to_csv(out_sin, index=False)
+    print(f"Guardado (sin nscore): {out_sin}")
+
+# %%
+# Deriva para un cluster concreto (elegir cluster_col según el modo que quieras analizar)
+CLUSTER_PARA_DERIVA = 1
+cluster_col_deriva = "cluster_con_nscore" if RUN_CON_NSCORE else "cluster_sin_nscore"
+df_sub = df[df[cluster_col_deriva] == CLUSTER_PARA_DERIVA].copy()
+plot_drift(
+    df_sub, COORDS, TARGET, n_bins=20,
+    coord_labels=coord_labels,
+    value_label=TARGET_LABEL,
+    title_prefix=f"Deriva (cluster {CLUSTER_PARA_DERIVA}, {cluster_col_deriva})",
+    save_path=IMAGENES_DIR / "cluster_deriva_cluster0.png",
+)
 
 # %%

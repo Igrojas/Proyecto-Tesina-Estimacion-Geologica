@@ -14,6 +14,8 @@ from matplotlib.colors import BoundaryNorm, ListedColormap
 from sklearn.neighbors import KNeighborsClassifier
 from sklearn.preprocessing import StandardScaler
 
+from config_figuras_tesina import setup_figuras_tesina
+
 warnings.filterwarnings("ignore")
 
 # --- Configuración ---
@@ -38,32 +40,19 @@ CLUSTER_PALETTE = [
 ]
 
 
-def setup_report_style() -> None:
-    """Estilo de figuras (misma línea que Analisis_EDA / Analisis_cluster)."""
-    plt.rcParams.update({
-        "figure.dpi": 150,
-        "savefig.dpi": 300,
-        "font.family": "sans-serif",
-        "font.size": 11,
-        "axes.titlesize": 12,
-        "axes.labelsize": 11,
-        "axes.grid": True,
-        "grid.alpha": 0.35,
-        "figure.facecolor": "white",
-        "axes.facecolor": "white",
-    })
+
 
 
 def _cluster_cmap_norm(n_clusters: int) -> tuple[ListedColormap, BoundaryNorm]:
     """Colormap y norma discretos para la colorbar."""
     colors = CLUSTER_PALETTE[:n_clusters]
     cmap = ListedColormap(colors)
-    boundaries = np.arange(n_clusters + 1) - 0.5
+    boundaries = np.arange(1, n_clusters + 2) - 0.5
     norm = BoundaryNorm(boundaries, n_clusters)
     return cmap, norm
 
 
-def set_proportional_aspect(ax: plt.Axes, x: np.ndarray, y: np.ndarray, z: np.ndarray) -> None:
+def set_proportional_aspect(ax: plt.Axes, x: np.ndarray, y: np.ndarray, z: np.ndarray, zoom_x: float = 2.0) -> None:
     """Ajusta el aspect ratio del gráfico 3D según el rango real de las coordenadas."""
     range_x = x.max() - x.min()
     range_y = y.max() - y.min()
@@ -71,7 +60,7 @@ def set_proportional_aspect(ax: plt.Axes, x: np.ndarray, y: np.ndarray, z: np.nd
     # Evitar divisiones por cero si un rango es nulo
     max_range = max(range_x, range_y, range_z)
     if max_range > 0:
-        ax.set_box_aspect((range_x / max_range, range_y / max_range, range_z / max_range))
+        ax.set_box_aspect(((range_x / max_range) * zoom_x, range_y / max_range, range_z / max_range))
 
 
 def plot_3d_clusters(
@@ -101,7 +90,7 @@ def plot_3d_clusters(
     
     set_proportional_aspect(ax, x, y, z)
     
-    plt.colorbar(sc, ax=ax, shrink=0.5, pad=0.12, label="Cluster", ticks=np.arange(n_clusters))
+    plt.colorbar(sc, ax=ax, shrink=0.5, pad=0.12, label="Cluster", ticks=np.arange(1, n_clusters + 1))
     plt.tight_layout()
     if save_path:
         save_path.parent.mkdir(parents=True, exist_ok=True)
@@ -146,7 +135,7 @@ def plot_3d_original_plus_val(
     
     plt.colorbar(
         plt.cm.ScalarMappable(norm=norm, cmap=cmap),
-        ax=ax, shrink=0.5, pad=0.12, label="Cluster", ticks=np.arange(n_clusters),
+        ax=ax, shrink=0.5, pad=0.12, label="Cluster", ticks=np.arange(1, n_clusters + 1),
     )
     ax.legend()
     plt.tight_layout()
@@ -159,14 +148,14 @@ def plot_3d_original_plus_val(
 # --- Ejecución ---
 # %%
 if __name__ == "__main__":
-    setup_report_style()
+    setup_figuras_tesina()
     IMAGENES_DIR.mkdir(parents=True, exist_ok=True)
 
     # 1) Datos Originales
     df_orig = pd.read_csv(INPUT_PATH)
     coords_orig = df_orig[COORD_COLS].values
     labels_orig = df_orig[CLUSTER_COL].values
-    n_clusters = int(labels_orig.max()) + 1
+    n_clusters = int(df_orig[CLUSTER_COL].nunique())
 
     # 2) Datos de Validación
     if not INPUT_VAL_PATH.exists():

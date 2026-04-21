@@ -66,8 +66,7 @@ def setup_figuras_tesina() -> None:
     """
     Configura rcParams de matplotlib para figuras de tesina:
     DPI de guardado, tipografía, grid, fondo blanco.
-    Llamar al inicio del script (o usar el setup_report_style de cada .py
-    que ya incluye esto; este módulo unifica DPI y criterios).
+    Llamar al inicio del script.
     """
     import matplotlib.pyplot as plt
 
@@ -76,17 +75,35 @@ def setup_figuras_tesina() -> None:
         "savefig.dpi": DPI_TESINA,
         "savefig.bbox": "tight",
         "savefig.format": FORMATO_FIGURA,
-        "font.family": "sans-serif",
-        "font.size": 11,
-        "axes.titlesize": 12,
-        "axes.labelsize": 11,
-        "xtick.labelsize": 10,
-        "ytick.labelsize": 10,
-        "legend.fontsize": 10,
+        "font.family": "serif",
+        "font.size": 12,
+        "axes.titlesize": 14,
+        "axes.titleweight": "bold",
+        "axes.labelsize": 12,
+        "xtick.labelsize": 11,
+        "ytick.labelsize": 11,
+        "legend.fontsize": 11,
         "axes.grid": True,
-        "grid.alpha": 0.35,
+        "grid.linestyle": "--",
+        "grid.alpha": 0.4,
         "axes.spines.top": False,
         "axes.spines.right": False,
         "figure.facecolor": "white",
         "axes.facecolor": "white",
     })
+
+def set_proportional_aspect(ax, df, x_col, y_col, z_col, zoom_x: float = 2.0) -> None:
+    """Ajusta el aspect ratio del gráfico 3D según el rango real de las coordenadas.
+    Se ha agregado zoom_x para ensanchar el eje X (Este) y evitar que se vea muy delgado.
+    """
+    x, y, z = df[x_col], df[y_col], df[z_col]
+    range_x = x.max() - x.min()
+    range_y = y.max() - y.min()
+    range_z = z.max() - z.min()
+    max_range = max(range_x, range_y, range_z)
+    if max_range > 0:
+        rx = (range_x / max_range) * zoom_x
+        ry = (range_y / max_range)
+        rz = (range_z / max_range)
+        ax.set_box_aspect((rx, ry, rz))
+
