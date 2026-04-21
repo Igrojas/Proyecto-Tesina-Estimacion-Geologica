@@ -299,7 +299,7 @@ print("Variable en estudio (etiqueta):", TARGET_LABEL)
 
 # Filtrar Norte > 26000
 n_antes = len(df)
-df = df[df["Norte"] <= 26000].copy()
+df = df[df["Norte"] <= 27000].copy()
 print(f"Filtro espacial (Norte <= 26000): se eliminaron {n_antes - len(df)} registros. Quedan: {len(df)}")
 
 # Eliminar valor sentinela -99 (trazabilidad en SENTINEL_VALUE y drop_sentinel_values)
