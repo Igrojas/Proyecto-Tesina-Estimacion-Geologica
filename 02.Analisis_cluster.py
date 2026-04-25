@@ -42,7 +42,7 @@ TARGET = "Rec_Peso_PND25_(%)"
 NSCORE_SUFFIX = "_nscore"
 TARGET_LABEL = "Recuperación en peso (%)"
 COORD_LABELS = ["Este (m)", "Norte (m)", "Cota (m)"]
-N_CLUSTERS = 3
+N_CLUSTERS = 4
 # Rango de k para explorar (método del codo + silueta)
 K_RANGE = (2, 11)  # prueba k desde 2 hasta k_max - 1
 # Ejecutar análisis: con nscore, sin nscore, o ambos
