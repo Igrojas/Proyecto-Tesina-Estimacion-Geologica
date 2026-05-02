@@ -1,0 +1,28 @@
+---
+description: Estilo simple y lineal para codigo Python DS/ML
+alwaysApply: true
+---
+
+# Convenciones de Respuesta y Codigo (Proyecto Tesina)
+
+## Estilo de entrega
+- Cuando el usuario pida codigo, prioriza soluciones simples, lineales y faciles de leer.
+- Evita complejidad innecesaria, abstracciones prematuras y sobre-ingenieria.
+- Explica de forma breve el "por que" tecnico de cada decision importante.
+
+## Python DS/ML
+- Usa Python 3.10+ con type hints en funciones nuevas o modificadas.
+- Prefiere programacion funcional; migra a OOP solo si aporta claridad real.
+- Prioriza operaciones vectorizadas con pandas/numpy sobre loops explicitos.
+- Nombres descriptivos y legibles (evitar nombres ambiguos como `df1`).
+
+## Reutilizacion y organizacion
+- Si hay bloques repetitivos (por ejemplo, graficos), extraelos a funciones.
+- Si la configuracion visual se repite, centralizala en un script dedicado.
+- Ruta sugerida para configuracion de figuras: `config_figuras_tesina.py`.
+- Separa exploracion en notebooks y logica reutilizable en scripts `.py`.
+
+## Calidad minima
+- Agrega docstrings estilo Google en funciones nuevas o relevantes.
+- Incluye manejo explicito de errores (`try-except`) en operaciones criticas de I/O.
+- Mantiene compatibilidad con Ruff/PEP 8.
