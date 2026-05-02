@@ -75,17 +75,21 @@ def find_nearest_pairs(
     org_df: pd.DataFrame,
     val_df: pd.DataFrame,
 ) -> pd.DataFrame:
-    """Para cada punto original, encuentra el punto de validacion mas cercano en 3D.
+    """Para cada sondaje original, encuentra el bloque de validacion mas cercano en 3D.
 
-    Utiliza un KD-Tree sobre las coordenadas del CSV de validacion.
-    Las coordenadas del original son Este/Norte/Cota y las de validacion xcentre/ycentre/zcentre.
+    Utiliza un KD-Tree sobre las coordenadas del modelo de bloques.
+    Guarda tanto las coordenadas del sondaje como las del bloque matcheado, para que
+    los scripts posteriores (ej. 041) puedan predecir directamente en las coordenadas
+    del bloque sin tener que recargar el modelo completo.
 
     Args:
         org_df: DataFrame original con columnas Este, Norte, Cota, recpe_og.
         val_df: DataFrame de validacion con columnas xcentre, ycentre, zcentre, recpe.
 
     Returns:
-        DataFrame con columnas originales, recpe_val (del vecino mas cercano) y distancia_m.
+        DataFrame con: coordenadas sondaje (Este/Norte/Cota), valor real (recpe_og),
+        coordenadas bloque matcheado (Este_val/Norte_val/Cota_val),
+        valor kriging (recpe_val) y distancia (distancia_m).
     """
     val_coords = val_df[["xcentre", "ycentre", "zcentre"]].to_numpy()
     org_coords = org_df[["Este", "Norte", "Cota"]].to_numpy()
@@ -93,8 +97,13 @@ def find_nearest_pairs(
     tree = cKDTree(val_coords)
     distances, indices = tree.query(org_coords, k=1)
 
+    matched = val_df.iloc[indices]
+
     result_df = org_df[["Este", "Norte", "Cota", "recpe_og"]].copy()
-    result_df["recpe_val"] = val_df["recpe"].iloc[indices].to_numpy()
+    result_df["Este_val"]    = matched["xcentre"].to_numpy()
+    result_df["Norte_val"]   = matched["ycentre"].to_numpy()
+    result_df["Cota_val"]    = matched["zcentre"].to_numpy()
+    result_df["recpe_val"]   = matched["recpe"].to_numpy()
     result_df["distancia_m"] = distances.round(2)
 
     return result_df
