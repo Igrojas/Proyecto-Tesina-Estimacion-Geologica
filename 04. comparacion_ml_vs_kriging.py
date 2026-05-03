@@ -10,7 +10,7 @@ Metodologia:
   tiende a producir modelos mas ajustados a los sondajes pero con menor capacidad de
   generalizacion a coordenadas nuevas (exactamente lo que necesitamos aqui).
 - Metricas: R2, RMSE, MAPE comparados contra el valor real del sondaje (recpe_og).
-  La tabla final incluye la diferencia porcentual de R2 respecto al kriging.
+  La tabla final incluye la diferencia en puntos porcentuales de R² respecto al kriging.
 - Features: solo coordenadas (simetrico con kriging).
 """
 
@@ -56,6 +56,8 @@ KRIGING_COL      = "recpe_val"
 
 SHOW_FIGURES = True
 
+RESULTS_DIR         = Path("data") / "results"
+PREDICTIONS_PATH    = RESULTS_DIR / "predicciones_ml_vs_kriging.csv"
 PLOTS_DIR           = Path("imagenes") / "comparacion_ml_kriging"
 METRICS_OUTPUT_PATH = DATA_DIR / "Obs" / "metricas_ml_vs_kriging.xlsx"
 
@@ -139,6 +141,7 @@ def main() -> None:
     setup_figuras_tesina()
     PLOTS_DIR.mkdir(parents=True, exist_ok=True)
     METRICS_OUTPUT_PATH.parent.mkdir(parents=True, exist_ok=True)
+    RESULTS_DIR.mkdir(parents=True, exist_ok=True)
 
     # — Datos de entrenamiento —
     train_df      = pd.read_excel(TRAIN_PATH)
@@ -176,6 +179,7 @@ def main() -> None:
     )
 
     all_metrics: list[dict] = [{"modelo": "Kriging", "delta_r2_pct": 0.0, **kriging_metrics}]
+    ml_predictions: dict[str, pd.Series] = {}
 
     # — Entrenar y evaluar cada modelo ML —
     for name, model in get_models():
@@ -187,7 +191,7 @@ def main() -> None:
         pred_og    = pd.Series(to_original(transformer, pred_gauss), index=y_real.index)
 
         metrics = compute_metrics(y_real, pred_og)
-        delta   = ((metrics["r2"] - kriging_r2) / abs(kriging_r2)) * 100.0
+        delta   = (metrics["r2"] - kriging_r2) * 100.0  # puntos porcentuales de R²
 
         print(
             f"R²={metrics['r2']:.4f}  RMSE={metrics['rmse']:.4f}  "
@@ -196,6 +200,7 @@ def main() -> None:
         )
 
         all_metrics.append({"modelo": name, "delta_r2_pct": delta, **metrics})
+        ml_predictions[name] = pred_og
 
         fig = plot_real_vs_ml_vs_kriging(
             y_true_og=y_real,
@@ -208,6 +213,13 @@ def main() -> None:
             plt.show()
         else:
             plt.close(fig)
+
+    # — Exportar predicciones para analisis geostadistico (05.) —
+    pred_export_df = comp_df[VAL_COORD_COLS + [TARGET_COL, KRIGING_COL]].copy()
+    for model_name, preds in ml_predictions.items():
+        pred_export_df[model_name] = preds.values
+    pred_export_df.to_csv(PREDICTIONS_PATH, index=False)
+    print(f"\nPredicciones exportadas: {PREDICTIONS_PATH.resolve()}")
 
     # — Tabla resumen —
     metrics_df = (
