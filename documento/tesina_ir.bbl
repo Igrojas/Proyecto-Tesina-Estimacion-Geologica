@@ -1,0 +1,44 @@
+\begin{thebibliography}{1}
+
+\bibitem{Moreira2021}
+Gabriel de~Castro~Moreira, Rudi César~Comiotto Modena, João Felipe
+  Coimbra~Leite Costa, and Diego~Machado Marques.
+\newblock A workflow for defining geological domains using machine learning and
+  geostatistics.
+\newblock {\em Tecnologia em Metalurgia, Materiais e Mineração}, 18:e2472,
+  2021.
+
+\bibitem{Emery2007}
+Xavier Emery.
+\newblock Apunte geoestadistica.
+\newblock 2007.
+
+\bibitem{Garnier2022}
+Maximiliano Garnier-Villarreal.
+\newblock Introducción al análisis geoestadístico de datos en geociencias:
+  teoría y aplicación.
+\newblock {\em Revista Geológica de América Central}, 67:1--22, 6 2022.
+
+\bibitem{Jia2018}
+Zhenyi Jia, Shenglu Zhou, Quanlong Su, Haomin Yi, and Junxiao Wang.
+\newblock Comparison study on the estimation of the spatial distribution of
+  regional soilmetal(loid)s pollution based on kriging interpolation and bp
+  neural network.
+\newblock {\em International Journal of Environmental Research and Public
+  Health}, 15, 1 2018.
+
+\bibitem{Mery2024}
+Nadia Mery, Mohammad Maleki, Gabriel País, Andrés Molina, Alejandro Cáceres,
+  and Xavier Emery.
+\newblock Fuzzy classification of mineral resources: Moving toward overlapping
+  categories to account for geological, economic, metallurgical, environmental,
+  and operational criteria.
+\newblock {\em Natural Resources Research}, 34:1271--1299, 6 2025.
+
+\bibitem{Nwaila2024}
+Glen~T. Nwaila, Derek~H. Rose, Hartwig~E. Frimmel, and Yousef Ghorbani.
+\newblock An integrated geodata science workflow for resource estimation: A
+  case study from the merensky reef, bushveld complex.
+\newblock {\em Natural Resources Research}, 34:1301--1329, 6 2025.
+
+\end{thebibliography}

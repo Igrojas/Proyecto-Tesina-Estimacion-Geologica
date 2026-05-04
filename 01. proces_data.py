@@ -109,14 +109,32 @@ def save_processed_data(data_df: pd.DataFrame, output_path: Path) -> None:
 input_path = Path(DATA_PATH)
 processed_path = Path(OUTPUT_PATH)
 
-raw_df = load_data(input_path)
-processed_df = select_variables(raw_df, COORDS, TARGET)
-processed_df = remove_sentinel_rows(processed_df, "recpe_og", SENTINEL_VALUE)
-processed_df = filter_max_norte(processed_df, MAX_NORTE)
+raw_df       = load_data(input_path)
+selected_df  = select_variables(raw_df, COORDS, TARGET)
+no_sent_df   = remove_sentinel_rows(selected_df, "recpe_og", SENTINEL_VALUE)
+processed_df = filter_max_norte(no_sent_df, MAX_NORTE)
+
+n_raw      = len(raw_df)
+n_selected = len(selected_df)
+n_sentinel = n_selected - len(no_sent_df)
+n_norte    = len(no_sent_df) - len(processed_df)
+n_final    = len(processed_df)
+
+print("=" * 45)
+print("  Resumen de carga y filtrado")
+print("=" * 45)
+print(f"  Registros crudos leidos    : {n_raw:>6,}")
+print(f"  Columnas seleccionadas     : {len(selected_df.columns)} ({', '.join(selected_df.columns.tolist())})")
+print(f"  Eliminados (valor centinela {SENTINEL_VALUE}): {n_sentinel:>4,}")
+print(f"  Eliminados (Norte > {MAX_NORTE:,})  : {n_norte:>4,}")
+print("-" * 45)
+print(f"  Registros finales          : {n_final:>6,}  ({n_final/n_raw*100:.1f}% del total)")
+print("=" * 45)
+
 save_processed_data(processed_df, processed_path)
 
 display(processed_df.head())
-print(f"Archivo procesado generado en: {processed_path.resolve()}")
+print(f"\nArchivo procesado generado en: {processed_path.resolve()}")
 
 
 # %%

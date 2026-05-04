@@ -195,11 +195,18 @@ setup_figuras_tesina()
 IMAGENES_DIR.mkdir(parents=True, exist_ok=True)
 
 # — Parte 1: extraer y guardar CSV de validacion —
-raw_df = load_csv(INPUT_PATH)
+raw_df    = load_csv(INPUT_PATH)
 coords_df = extract_coords_for_estimacion(raw_df)
 coords_df.to_csv(VAL_CSV_PATH, index=False)
+
+print("=" * 45)
+print("  Parte 1 — Modelo de bloques de validacion")
+print("=" * 45)
+print(f"  Registros crudos leidos    : {len(raw_df):>6,}")
+print(f"  Bloques con coords + recpe : {len(coords_df):>6,}")
+print(f"  CSV generado               : {VAL_CSV_PATH.name}")
+print("=" * 45)
 show_df(coords_df.head())
-print(f"CSV validacion generado: {VAL_CSV_PATH.resolve()}")
 
 # — Parte 2: comparacion 1-a-1 con vecino mas cercano —
 org_df = pd.read_excel(ORG_XLSX_PATH)
@@ -207,18 +214,27 @@ val_df = load_csv(VAL_CSV_PATH)
 
 comp_df = find_nearest_pairs(org_df, val_df)
 comp_df.to_csv(COMP_OUTPUT_PATH, index=False)
-print(f"\nComparacion guardada: {COMP_OUTPUT_PATH.resolve()}")
-print(f"Distancia media al vecino mas cercano: {comp_df['distancia_m'].mean():.1f} m")
-print(f"Distancia maxima: {comp_df['distancia_m'].max():.1f} m")
 
 metrics = compute_metrics(comp_df["recpe_og"], comp_df["recpe_val"])
-print(f"\nMetricas original vs validacion:")
-print(f"  R²   = {metrics['r2']:.4f}")
-print(f"  RMSE = {metrics['rmse']:.4f}")
-print(f"  MAPE = {metrics['mape_pct']:.2f}%")
+
+print("\n" + "=" * 45)
+print("  Parte 2 — Emparejamiento sondaje → bloque")
+print("=" * 45)
+print(f"  Sondajes originales        : {len(org_df):>6,}")
+print(f"  Bloques disponibles        : {len(val_df):>6,}")
+print(f"  Pares generados            : {len(comp_df):>6,}")
+print(f"  Distancia media            : {comp_df['distancia_m'].mean():>8.1f} m")
+print(f"  Distancia maxima           : {comp_df['distancia_m'].max():>8.1f} m")
+print(f"  Distancia minima           : {comp_df['distancia_m'].min():>8.1f} m")
+print("-" * 45)
+print(f"  R²   (original vs kriging) : {metrics['r2']:>8.4f}")
+print(f"  RMSE (original vs kriging) : {metrics['rmse']:>8.4f}")
+print(f"  MAPE (original vs kriging) : {metrics['mape_pct']:>7.2f}%")
+print("=" * 45)
 
 fig = plot_comparacion_real_vs_val(comp_df, metrics)
 fig.savefig(IMAGENES_DIR / "comparacion_original_vs_validacion.png", dpi=300)
+print(f"\nGrafico guardado: {(IMAGENES_DIR / 'comparacion_original_vs_validacion.png').resolve()}")
 if SHOW_FIGURES:
     plt.show()
 else:

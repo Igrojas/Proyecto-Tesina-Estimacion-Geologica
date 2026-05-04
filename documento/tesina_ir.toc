@@ -1,0 +1,14 @@
+\babel@toc {spanish}{}\relax 
+\contentsline {section}{\numberline {1}Introducción}{4}{}%
+\contentsline {section}{\numberline {2}Presentación de la propuesta}{5}{}%
+\contentsline {subsection}{\numberline {2.1}Problema}{5}{}%
+\contentsline {subsection}{\numberline {2.2}Acercamiento, actores, dimensiones}{6}{}%
+\contentsline {subsection}{\numberline {2.3}Descripción de la propuesta}{6}{}%
+\contentsline {subsection}{\numberline {2.4}Descripción del MVP y objetivos}{7}{}%
+\contentsline {subsection}{\numberline {2.5}Descripción de validación}{7}{}%
+\contentsline {section}{\numberline {3}Obtención de datos}{8}{}%
+\contentsline {section}{\numberline {4}Depuración de datos}{8}{}%
+\contentsline {section}{\numberline {5}Exploración de datos}{9}{}%
+\contentsline {section}{\numberline {6}Modelado de datos}{12}{}%
+\contentsline {section}{\numberline {7}Interpretación de resultados}{19}{}%
+\contentsline {section}{\numberline {8}Conclusión}{20}{}%

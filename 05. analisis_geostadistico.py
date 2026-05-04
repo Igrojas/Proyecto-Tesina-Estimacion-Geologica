@@ -31,11 +31,15 @@ setup_figuras_tesina = cfg_fig.setup_figuras_tesina
 
 DATA_DIR         = Path("data")
 PREDICTIONS_PATH = DATA_DIR / "results" / "predicciones_ml_vs_kriging.csv"
+# Para histogramas se puede usar el archivo gauss (tiene recpe_og igual + recpe_gauss)
 TRAIN_PATH       = DATA_DIR / "processed" / "df_rec_peso_pnd25_gauss.xlsx"
+# Para la deriva se usa el mismo dataset que 02. Eda_analisis.py para que la curva
+# Original sea identica a la generada en el EDA.
+ORIG_PATH        = DATA_DIR / "processed" / "df_rec_peso_pnd25.xlsx"
 PLOTS_DIR        = Path("imagenes") / "analisis_geostadistico"
 
-SHOW_FIGURES = True
-N_BINS_DRIFT = 12   # bins para la grafica de deriva por coordenada
+SHOW_FIGURES     = True
+BIN_SIZE_DERIVA  = 100.0  # metros por bin — igual que en 02. Eda_analisis.py
 
 COORD_COLS  = ["Este_val", "Norte_val", "Cota_val"]
 TARGET_COL  = "recpe_og"
@@ -128,22 +132,23 @@ def _media_por_bin(
 def plot_deriva(
     pred_df: pd.DataFrame,
     series_pred: dict[str, pd.Series],
-    train_df: pd.DataFrame,
+    orig_df: pd.DataFrame,
     coord_col: str,
-    n_bins: int = N_BINS_DRIFT,
+    bin_size: float = BIN_SIZE_DERIVA,
 ) -> plt.Figure:
     """Grafica de deriva espacial: media por bin a lo largo de una coordenada.
 
     Incluye los datos originales de sondaje (linea solida morada) y las estimaciones
-    de Kriging y ML (lineas punteadas, colores distintos). Los bins se definen sobre
-    el rango combinado de ambas fuentes para que el eje X sea consistente.
+    de Kriging y ML (lineas punteadas, colores distintos). Los bins son de ancho fijo
+    en metros (bin_size=100 por defecto, igual que en 02. Eda_analisis.py) para que
+    la curva Original sea identica a la del EDA.
 
     Args:
         pred_df: DataFrame con columnas Este_val/Norte_val/Cota_val y estimaciones.
         series_pred: {nombre: serie} de estimaciones alineadas con pred_df.
-        train_df: DataFrame original de sondajes con columnas Este/Norte/Cota y recpe_og.
+        orig_df: DataFrame original de sondajes (df_rec_peso_pnd25.xlsx).
         coord_col: columna de coordenada en pred_df (p.ej. "Este_val").
-        n_bins: numero de intervalos espaciales.
+        bin_size: ancho de cada bin en metros.
 
     Returns:
         Figure con media ± std por bin. Original en morado solido; resto punteado.
@@ -151,18 +156,18 @@ def plot_deriva(
     orig_coord_col = coord_col.replace("_val", "")
 
     pred_coords = pred_df[coord_col].dropna().values
-    orig_coords = train_df[orig_coord_col].dropna().values
+    orig_coords = orig_df[orig_coord_col].dropna().values
 
     coord_min = min(pred_coords.min(), orig_coords.min())
     coord_max = max(pred_coords.max(), orig_coords.max())
-    bin_edges = np.linspace(coord_min, coord_max, n_bins + 1)
+    bin_edges = np.arange(coord_min, coord_max + bin_size, bin_size)
 
     fig, ax = plt.subplots(figsize=(8, 4))
 
     # — Datos Originales: linea solida, morado —
-    orig_mask = train_df[orig_coord_col].notna()
-    orig_c    = train_df.loc[orig_mask, orig_coord_col].values
-    orig_vals = train_df.loc[orig_mask, TARGET_COL].values
+    orig_mask = orig_df[orig_coord_col].notna()
+    orig_c    = orig_df.loc[orig_mask, orig_coord_col].values
+    orig_vals = orig_df.loc[orig_mask, TARGET_COL].values
     mids, medias, stds = _media_por_bin(orig_c, orig_vals, bin_edges)
     valid = ~np.isnan(medias)
     ax.plot(
@@ -195,7 +200,7 @@ def plot_deriva(
 
     ax.set_xlabel(COORD_LABELS.get(coord_col, coord_col))
     ax.set_ylabel("Media Recuperación en Peso (%)")
-    ax.set_title(f"Deriva espacial — {COORD_LABELS.get(coord_col, coord_col)}")
+    ax.set_title(f"Deriva — {COORD_LABELS.get(coord_col, coord_col)} ({int(bin_size)} m)")
     ax.legend(fontsize=8)
     fig.tight_layout()
     return fig
@@ -217,7 +222,8 @@ def main() -> None:
             "Ejecutar primero '04. comparacion_ml_vs_kriging.py'."
         )
 
-    train_df = pd.read_excel(TRAIN_PATH)
+    train_df = pd.read_excel(TRAIN_PATH)  # gauss → para histogramas
+    orig_df  = pd.read_excel(ORIG_PATH)  # sin gauss → para deriva (igual que 02.)
 
     # Columnas ML = todo lo que no sea coordenadas, target ni kriging
     known_cols = set(COORD_COLS + [TARGET_COL, KRIGING_COL])
@@ -225,7 +231,7 @@ def main() -> None:
 
     print(f"Modelos ML encontrados en CSV: {ml_cols}")
     print(f"Puntos de prediccion         : {len(pred_df)}")
-    print(f"Sondajes originales          : {len(train_df)}\n")
+    print(f"Sondajes originales          : {len(orig_df)}\n")
 
     # — Construir dict ordenado para graficas —
     # Original primero, luego Kriging, luego ML (orden del CSV)
@@ -255,7 +261,7 @@ def main() -> None:
 
     # — Graficas de deriva por coordenada —
     for coord in COORD_COLS:
-        fig_drift = plot_deriva(pred_df, series_para_deriva, train_df, coord_col=coord)
+        fig_drift = plot_deriva(pred_df, series_para_deriva, orig_df, coord_col=coord)
         fname = f"deriva_{coord.lower().replace('_val', '')}.png"
         fig_drift.savefig(PLOTS_DIR / fname, dpi=300)
         print(f"Deriva guardada  : {(PLOTS_DIR / fname).resolve()}")

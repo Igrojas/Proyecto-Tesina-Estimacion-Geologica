@@ -24,6 +24,7 @@ DATA_PATH = Path("data") / "processed" / "df_rec_peso_pnd25.xlsx"
 GAUSS_OUTPUT_PATH = Path("data") / "processed" / "df_rec_peso_pnd25_gauss.xlsx"
 COORDS = ["Este", "Norte", "Cota"]
 TARGET = "recpe_og"
+TARGET_LABEL = "Recuperación en Peso (%)"
 EDA_IMAGENES_DIR = Path("imagenes") / "eda"
 SHOW_FIGURES = True
 
@@ -94,7 +95,7 @@ print(f"Archivo con transformacion gaussiana: {GAUSS_OUTPUT_PATH.resolve()}")
 fig_hist = plot_hist_original_vs_gaussian(
     original_values=eda_df[TARGET],
     gaussian_values=eda_df["recpe_gauss"],
-    target_label=TARGET,
+    target_label=TARGET_LABEL,
 )
 fig_hist.savefig(EDA_IMAGENES_DIR / "hist_original_vs_gauss_recpe.png", dpi=300)
 maybe_show_figure(SHOW_FIGURES)
@@ -103,7 +104,7 @@ maybe_show_figure(SHOW_FIGURES)
 fig_qq = plot_qq_original_vs_gaussian(
     original_values=eda_df[TARGET],
     gaussian_values=eda_df["recpe_gauss"],
-    target_label=TARGET,
+    target_label=TARGET_LABEL,
 )
 fig_qq.savefig(EDA_IMAGENES_DIR / "qq_original_vs_gauss_recpe.png", dpi=300)
 maybe_show_figure(SHOW_FIGURES)
@@ -115,6 +116,7 @@ fig_3d = plot_mapa_3d(
     y_col=COORDS[1],
     z_col=COORDS[2],
     value_col=TARGET,
+    colorbar_label=TARGET_LABEL,
 )
 
 fig_3d.savefig(EDA_IMAGENES_DIR / "mapa_3d_recpe.png", dpi=300)
@@ -127,6 +129,7 @@ fig_proj = plot_proyecciones_2d(
     y_col=COORDS[1],
     z_col=COORDS[2],
     value_col=TARGET,
+    colorbar_label=TARGET_LABEL,
 )
 fig_proj.savefig(EDA_IMAGENES_DIR / "proyecciones_2d_recpe.png", dpi=300)
 maybe_show_figure(SHOW_FIGURES)
@@ -137,6 +140,7 @@ fig_deriva = plot_deriva(
     coord_cols=COORDS,
     value_col=TARGET,
     bin_size=100.0,
+    value_label=TARGET_LABEL,
 )
 fig_deriva.savefig(EDA_IMAGENES_DIR / "deriva_recpe.png", dpi=300)
 maybe_show_figure(SHOW_FIGURES)

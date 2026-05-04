@@ -1,0 +1,50 @@
+This is BibTeX, Version 0.99d
+Capacity: max_strings=200000, hash_size=200000, hash_prime=170003
+The top-level auxiliary file: tesina_ir.aux
+Reallocating 'name_of_file' (item size: 1) to 6 items.
+The style file: plain.bst
+Reallocating 'name_of_file' (item size: 1) to 7 items.
+Database file #1: export.bib
+Warning--empty journal in Emery2007
+You've used 6 entries,
+            2118 wiz_defined-function locations,
+            543 strings with 5445 characters,
+and the built_in function-call counts, 2044 in all, are:
+= -- 188
+> -- 121
+< -- 0
++ -- 50
+- -- 42
+* -- 162
+:= -- 368
+add.period$ -- 18
+call.type$ -- 6
+change.case$ -- 39
+chr.to.int$ -- 0
+cite$ -- 7
+duplicate$ -- 64
+empty$ -- 138
+format.name$ -- 42
+if$ -- 402
+int.to.chr$ -- 0
+int.to.str$ -- 6
+missing$ -- 6
+newline$ -- 33
+num.names$ -- 12
+pop$ -- 31
+preamble$ -- 1
+purify$ -- 33
+quote$ -- 0
+skip$ -- 43
+stack$ -- 0
+substring$ -- 113
+swap$ -- 5
+text.length$ -- 0
+text.prefix$ -- 0
+top$ -- 0
+type$ -- 24
+warning$ -- 1
+while$ -- 16
+width$ -- 7
+write$ -- 66
+(There was 1 warning)

@@ -121,7 +121,7 @@ def plot_hist_original_vs_gaussian(
         edgecolor="white",
         linewidth=0.3,
     )
-    axes[0].set_title(f"Distribución original: {target_label}")
+    axes[0].set_title(f"Distribución original:\n{target_label}")
     axes[0].set_xlabel(target_label)
     axes[0].set_ylabel("Frecuencia")
 
@@ -133,7 +133,7 @@ def plot_hist_original_vs_gaussian(
         edgecolor="white",
         linewidth=0.3,
     )
-    axes[1].set_title(f"Distribución transformada: {target_label}")
+    axes[1].set_title(f"Distribución transformada:\n{target_label}")
     axes[1].set_xlabel(f"{target_label} (normal score)")
     axes[1].set_ylabel("Frecuencia")
 
@@ -160,12 +160,12 @@ def plot_qq_original_vs_gaussian(
                              constrained_layout=True)
 
     stats.probplot(original_values, dist="norm", plot=axes[0])
-    axes[0].set_title(f"Q-Q plot original: {target_label}")
+    axes[0].set_title(f"Q-Q plot original:\n{target_label}")
     axes[0].get_lines()[0].set(markersize=2.5, alpha=0.7, color=COLOR_HIST_ORIGINAL)
     axes[0].get_lines()[1].set(color=COLOR_QQ_RECTA, linewidth=1.0)
 
     stats.probplot(gaussian_values, dist="norm", plot=axes[1])
-    axes[1].set_title(f"Q-Q plot transformado (normal score)")
+    axes[1].set_title(f"Q-Q plot transformado:\n{target_label} (normal score)")
     axes[1].get_lines()[0].set(markersize=2.5, alpha=0.7, color=COLOR_HIST_TRANSFORMADO)
     axes[1].get_lines()[1].set(color=COLOR_QQ_RECTA, linewidth=1.0)
 
@@ -214,12 +214,13 @@ def plot_mapa_3d(df, x_col, y_col, z_col, value_col,
     _set_box_aspect_3d(ax, df, x_col, y_col, z_col,
                         zoom_x=zoom_x, zoom_y=1.0, zoom_z=zoom_z)
     cb_label = value_col if colorbar_label is None else colorbar_label
-    colorbar = fig.colorbar(sc, ax=ax, shrink=0.62, pad=0.06, label=cb_label)
+    # pad=0.15 evita que la barra de color se solape con el label del eje Z (Cota).
+    # tight_layout se omite porque no funciona correctamente con ejes 3D.
+    colorbar = fig.colorbar(sc, ax=ax, shrink=0.55, pad=0.15, label=cb_label)
     if colorbar_ticks is not None:
         colorbar.set_ticks(colorbar_ticks)
     if colorbar_ticklabels is not None:
         colorbar.set_ticklabels(colorbar_ticklabels)
-    fig.tight_layout()
     return fig
 
 
@@ -287,6 +288,7 @@ def plot_deriva(
     bin_size: float = 10.0,
     ancho_cm: float | None = None,
     alto_cm: float | None = None,
+    value_label: str | None = None,
 ):
     """
     3 paneles de deriva espacial (promedio por tramos de bin_size metros).
@@ -326,9 +328,10 @@ def plot_deriva(
             markersize=3.0,
             color=COLOR_DERIVA,
         )
+        ylabel = f"Promedio {value_label}" if value_label else f"Promedio {value_col}"
         ax.set_title(f"Deriva — {coord} ({int(bin_size)} m)")
         ax.set_xlabel(coord)
-        ax.set_ylabel(f"Promedio {value_col}")
+        ax.set_ylabel(ylabel)
         ax.set_ylim(10, 30)
     return fig
 

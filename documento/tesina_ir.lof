@@ -1,0 +1,17 @@
+\babel@toc {spanish}{}\relax 
+\contentsline {figure}{\numberline {1}{\ignorespaces Distribución original y transformada (Normal Score) de la recuperación en peso.}}{10}{}%
+\contentsline {figure}{\numberline {2}{\ignorespaces Gráfico Q-Q de la recuperación en peso original y transformada.}}{10}{}%
+\contentsline {figure}{\numberline {3}{\ignorespaces Distribución espacial 3D de la recuperación en peso.}}{11}{}%
+\contentsline {figure}{\numberline {4}{\ignorespaces Proyecciones 2D de la recuperación en peso en los planos Este-Norte, Este-Cota y Norte-Cota.}}{11}{}%
+\contentsline {figure}{\numberline {5}{\ignorespaces Deriva espacial de la recuperación en peso en las direcciones Este, Norte y Cota.}}{12}{}%
+\contentsline {figure}{\numberline {6}{\ignorespaces Visualización 3D de los clusters definidos por K-Means.}}{13}{}%
+\contentsline {figure}{\numberline {7}{\ignorespaces Proyecciones 2D de los clusters en los planos Este-Norte, Este-Cota y Norte-Cota.}}{13}{}%
+\contentsline {figure}{\numberline {8}{\ignorespaces Distribución de recuperación en peso por cluster y efecto proporcional.}}{14}{}%
+\contentsline {figure}{\numberline {9}{\ignorespaces Recuperación en peso real vs predicha: KNN y Kriging.}}{15}{}%
+\contentsline {figure}{\numberline {10}{\ignorespaces Recuperación en peso real vs predicha: Gradient Boosting y Kriging.}}{15}{}%
+\contentsline {figure}{\numberline {11}{\ignorespaces Recuperación en peso real vs predicha: XGBoost y Kriging.}}{16}{}%
+\contentsline {figure}{\numberline {12}{\ignorespaces Recuperación en peso real vs predicha: Random Forest y Kriging.}}{16}{}%
+\contentsline {figure}{\numberline {13}{\ignorespaces Comparación de distribuciones de recuperación en peso: datos originales, Kriging y modelos de Machine Learning.}}{17}{}%
+\contentsline {figure}{\numberline {14}{\ignorespaces Deriva espacial en la dirección Este: comparación entre datos originales, Kriging y modelos de Machine Learning.}}{18}{}%
+\contentsline {figure}{\numberline {15}{\ignorespaces Deriva espacial en la dirección Norte: comparación entre datos originales, Kriging y modelos de Machine Learning.}}{18}{}%
+\contentsline {figure}{\numberline {16}{\ignorespaces Deriva espacial en la dirección Cota: comparación entre datos originales, Kriging y modelos de Machine Learning.}}{19}{}%
