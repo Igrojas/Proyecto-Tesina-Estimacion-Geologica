@@ -1,0 +1,9 @@
+\xpg@aux {}{spanish}
+\beamer@sectionintoc {1}{Contexto y problema}{3}{0}{1}
+\beamer@sectionintoc {2}{Propuesta y objetivos}{6}{0}{2}
+\beamer@sectionintoc {3}{Datos y depuración}{9}{0}{3}
+\beamer@sectionintoc {4}{Exploración espacial}{12}{0}{4}
+\beamer@sectionintoc {5}{Modelado: dominios con K-Means}{15}{0}{5}
+\beamer@sectionintoc {6}{Modelado: ML vs Kriging}{18}{0}{6}
+\beamer@sectionintoc {7}{Interpretación de resultados}{22}{0}{7}
+\beamer@sectionintoc {8}{Conclusiones y trabajo futuro}{25}{0}{8}
